@@ -1,0 +1,18 @@
+h2, h3, h4, h5, h6 {
+    color: #000000;
+}
+h1 {
+    color: #cf1d11;
+    font-family: "Arial Black";
+    font-style: oblique 30deg;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 16rem;
+    padding: 2rem 1rem;
+    background-color: #5C5C5C;
+}

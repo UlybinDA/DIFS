@@ -1,0 +1,5 @@
+omega z + true 0.0
+alpha_p y + false 54.8
+kappa z + true 0.0
+alpha_n y - false 54.8
+phi z + true 0.0
