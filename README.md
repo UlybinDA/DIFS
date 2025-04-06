@@ -9,5 +9,5 @@
 - **Strategy Analysis Tools**: Calculate **completeness**, **redundancy**, and **multiplicity** of diffraction data; visualize their dependence on interplanar spacing (*d-spacing*) via customizable plots.
 - **Reciprocal Space Analysis**: Analyze coverage of reciprocal space by experimental scans and predict gaps in data collection.
 - **Diffraction Mapping**: Generate 3D, 2D, and 1D diffraction maps showing diffraction condition occurrences in goniometer axis coordinates (e.g., φ, ω, κ angles).
-- **Basic Graphical Interface (GUI)**: Interactive tools for real-time strategy adjustments, parameter sweeps, and visualization of results.
+- **Basic Graphical Interface (GUI)**: Interactive tools based on [Dash](https://github.com/plotly/dash) for adjusting strategy in real time and visualizing results.
 - **Extensible API**: Customize simulations with user-defined parameters, constraints, and experimental geometries.
