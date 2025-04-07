@@ -195,7 +195,7 @@ first_page = html.Div([
             accessKey='U'
 
         ),
-        dcc.Upload(html.Button('Load_UB', style={'display': 'inline-block'}), id='load_ub',
+        dcc.Upload(html.Button('Upload_UB', style={'display': 'inline-block'}), id='upload_ub',
                    accept='.p4p, .par, .txt',
                    multiple=False, max_size=500000),
 
@@ -418,9 +418,9 @@ second_page = html.Div([
     html.Div([
         html.Button('Download instrument model', id='download_instrument_btn', n_clicks=0),
         dcc.Download(id='download_instrument'),
-        dcc.Upload(html.Button('Load instrument model'),
-                   accept='.json', multiple=False, max_size=100000, id='load_instrument'),
-        dcc.Dropdown(id='select_intrument', style={
+        dcc.Upload(html.Button('Upload instrument model'),
+                   accept='.json', multiple=False, max_size=100000, id='upload_instrument'),
+        dcc.Dropdown(id='select_instrument', style={
             'vertical-align': 'top',
             'display': 'inline-block',
             'width': '500px',
@@ -442,7 +442,7 @@ second_page = html.Div([
                   id='set_wavelength_button',
                   n_clicks=0
               ),
-              dcc.Upload(html.Button('Load wavelength'), id='load_wavelength',
+              dcc.Upload(html.Button('Upload wavelength'), id='upload_wavelength',
                          accept='.json',
                          multiple=False, max_size=100),
               html.Button('Download wavelength', id='download_wavelength_btn', n_clicks=0),
@@ -535,13 +535,13 @@ second_page = html.Div([
                     }
                     ),
         dcc.Download(id='download_goniometer', ),
-        dcc.Upload(html.Button('Upload File', style={'display': 'inline-block'}), id='load_goniometer', accept='.json',
+        dcc.Upload(html.Button('Upload goniometer', style={'display': 'inline-block'}), id='upload_goniometer', accept='.json',
                    multiple=False, max_size=10000),
         dcc.Dropdown(options=goniometers, value='', id='goniometer_dropdown', clearable=False),),
 
         style={'width': '1000px'}),
     html.Div((
-        dcc.Upload(html.Button('Load logic collision', style={'display': 'inline-block'}), id='load_collision_log',
+        dcc.Upload(html.Button('Upload logic collision', style={'display': 'inline-block'}), id='upload_collision_log',
                    accept='.json',
                    multiple=False, max_size=10000),
         dcc.Checklist(['check collision'], id='collision_check'),
@@ -629,7 +629,7 @@ second_page = html.Div([
                     }
                     ),
         dcc.Download(id='download_detector', ),
-        dcc.Upload(html.Button('Load detector', style={'display': 'inline-block'}), id='load_detector',
+        dcc.Upload(html.Button('Upload detector', style={'display': 'inline-block'}), id='upload_detector',
                    accept='.json',
                    multiple=False, max_size=400),
 
@@ -666,7 +666,7 @@ second_page = html.Div([
                     }
                     ),
         dcc.Download(id='download_obstacles', ),
-        dcc.Upload(html.Button('Load_obstacles', style={'display': 'inline-block'}), id='load_obstacles',
+        dcc.Upload(html.Button('Upload_obstacles', style={'display': 'inline-block'}), id='upload_obstacles',
                    accept='.json', multiple=False, max_size=10000),
 
     ], ),
@@ -717,7 +717,7 @@ third_page = html.Div([
                 n_clicks=0),
             dcc.Download(id='download_runs'),
             dcc.Upload(html.Button(
-                'Load runs', ), id='load_runs', accept='.json', multiple=False, max_size=10000)
+                'Upload runs', ), id='upload_runs', accept='.json', multiple=False, max_size=10000)
 
         ],
 
@@ -1231,8 +1231,8 @@ def set_cell_by_UB_matr(n_clicks, data):
     Output('Cell_parameters', 'data', allow_duplicate=True),
     Output('stored_UB_table', 'data', allow_duplicate=True),
     Output('stored_parameters_table', 'data', allow_duplicate=True),
-    Input('load_ub', 'contents'),
-    State('load_ub', 'filename'),
+    Input('upload_ub', 'contents'),
+    State('upload_ub', 'filename'),
     prevent_initial_call=True
 )
 @mylogger(level='DEBUG')
@@ -1508,14 +1508,14 @@ def download_detector(n_clicks):
 
 @callback(
     Output('hidden_div_2', 'children', allow_duplicate=True),
-    Output('load_detector', 'contents'),  # workaround to upload from same dir multiple times
+    Output('upload_detector', 'contents'),  # workaround to upload from same dir multiple times
     Output('circle_parameter_table', 'data', allow_duplicate=True),
     Output('rectangle_parameter_table', 'data', allow_duplicate=True),
     Output('Det_geom_dropdown', 'value', allow_duplicate=True),
     Output('stored_circle_parameters', 'data', allow_duplicate=True),
     Output('stored_rectangle_parameters', 'data', allow_duplicate=True),
     Output('stored_detector_dropdown', 'data', allow_duplicate=True),
-    Input('load_detector', 'contents'),
+    Input('upload_detector', 'contents'),
     prevent_initial_call=True
 )
 @mylogger(level='DEBUG')
@@ -1590,9 +1590,9 @@ def set_wavelength(n_clicks, wavelength):
 @callback(
     Output('wavelength_input', 'value', allow_duplicate=True),
     Output('stored_wavelength_val', 'data', allow_duplicate=True),
-    Output('load_wavelength', 'contents'),
+    Output('upload_wavelength', 'contents'),
     Output('hidden_div_2', 'children', allow_duplicate=True),
-    Input('load_wavelength', 'contents'),
+    Input('upload_wavelength', 'contents'),
     prevent_initial_call=True
 )
 @mylogger(level='DEBUG')
@@ -1644,8 +1644,8 @@ def download_goniometer(n_clicks):
     Output('hidden_div_2', 'children', allow_duplicate=True),
     Output('Goniometer_table', 'data', allow_duplicate=True),
     Output('stored_goniometer_table', 'data', allow_duplicate=True),
-    Output('load_goniometer', 'contents'),
-    Input('load_goniometer', 'contents'),
+    Output('upload_goniometer', 'contents'),
+    Input('upload_goniometer', 'contents'),
     prevent_initial_call=True
 )
 @mylogger(level='DEBUG')
@@ -1666,9 +1666,9 @@ def load_goniometer(contents):
 
 
 @callback(
-    Output('load_collision_log', 'contents'),
+    Output('upload_collision_log', 'contents'),
     Output('hidden_div_2', 'children', allow_duplicate=True),
-    Input('load_collision_log', 'contents'),
+    Input('upload_collision_log', 'contents'),
 
     prevent_initial_call=True
 )
@@ -1772,12 +1772,12 @@ def download_obstacles(n_clicks):
 
 
 @callback(
-    Output('load_obstacles', 'contents'),
+    Output('upload_obstacles', 'contents'),
     Output('obstacle_div', 'children', allow_duplicate=True),
     Output('stored_obstacle_num', 'data', allow_duplicate=True),
     Output('stored_obstacles_div', 'data', allow_duplicate=True),
     Output('hidden_div_2', 'children', allow_duplicate=True),
-    Input('load_obstacles', 'contents'),
+    Input('upload_obstacles', 'contents'),
     State('stored_obstacle_num', 'data'),
     prevent_initial_call=True
 )
@@ -1915,8 +1915,8 @@ def download_instrument(n_clicks):
     Output('stored_obstacles_div', 'data', allow_duplicate=True),
     Output('stored_obstacle_num', 'data', allow_duplicate=True),
 
-    Output('load_instrument', 'contents', allow_duplicate=True),
-    Input('load_instrument', 'contents'),
+    Output('upload_instrument', 'contents', allow_duplicate=True),
+    Input('upload_instrument', 'contents'),
     State('stored_obstacle_num', 'data'),
     prevent_initial_call=True
 )
@@ -2054,12 +2054,12 @@ def download_runs(n_clicks):
 
 
 @callback(
-    Output('load_runs', 'contents'),
+    Output('upload_runs', 'contents'),
     Output('hidden_div_3', 'children', allow_duplicate=True),
     Output('stored_runs_num', 'data', allow_duplicate=True),
     Output('runs_div', 'children', allow_duplicate=True),
     Output('stored_runs_div', 'data', allow_duplicate=True),
-    Input('load_runs', 'contents'),
+    Input('upload_runs', 'contents'),
     State('stored_runs_num', 'data'),
     prevent_initial_call=True
 )
