@@ -535,7 +535,8 @@ second_page = html.Div([
                     }
                     ),
         dcc.Download(id='download_goniometer', ),
-        dcc.Upload(html.Button('Upload goniometer', style={'display': 'inline-block'}), id='upload_goniometer', accept='.json',
+        dcc.Upload(html.Button('Upload goniometer', style={'display': 'inline-block'}), id='upload_goniometer',
+                   accept='.json',
                    multiple=False, max_size=10000),
         dcc.Dropdown(options=goniometers, value='', id='goniometer_dropdown', clearable=False),),
 
@@ -834,6 +835,33 @@ fourth_page = html.Div([
             'margin-top': '3vw',
             'width': '100px'}
     ),
+    html.Div([
+        html.Button('Save as hkl',
+                    id='download_data_hkl_btn',
+                    n_clicks=0)
+    ],
+
+        style={
+            'display': 'inline-block',
+            'vertical-align': 'top',
+            'margin-left': '1vw',
+            'margin-top': '3vw',
+            'width': '100px'}
+    ),
+    html.Div([
+        html.Button('Sep unique and common',
+                    id='separate_unique_common_btn',
+                    n_clicks=0)
+    ],
+
+        style={
+            'display': 'inline-block',
+            'vertical-align': 'top',
+            'margin-left': '1vw',
+            'margin-top': '3vw',
+            'width': '100px'}
+    ),
+    dcc.Download(id='download_data_hkl'),
     dcc.Upload([
         html.Button('Upload hkl',
                     )
@@ -2153,6 +2181,34 @@ def calc_experiment(n_clicks, children
         return completeness, list((True, calc_exp_no_det_warn.header, calc_exp_no_det_warn.body)), {
             'background-color': 'green'}, centring, children, pg, completeness
     return completeness, list((False, '', '')), {'background-color': 'green'}, centring, children, pg, completeness
+
+@callback(Output('hidden_div_4', 'children', allow_duplicate=True),
+    Input('separate_unique_common_btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def separate_u_c(n_clicks):
+    if n_clicks == 0:
+        raise dash.exceptions.PreventUpdate()
+    if exp1.scan_data is None or len(exp1.scan_data) < 2:
+        return (True, separate_unique_common_error.header,separate_unique_common_error.body)
+    exp1.separate_unique_common()
+    return no_upd
+
+
+@callback(
+    Output('download_data_hkl', 'data'),
+    Output('hidden_div_4', 'children', allow_duplicate=True),
+    Input('download_data_hkl_btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def download_data_hkl(n_clicks):
+    if n_clicks == 0:
+        raise dash.exceptions.PreventUpdate()
+    try:
+        hkl_data_str = exp1.form_scan_data_as_hkl()
+    except NoScanDataError as e:
+        return no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
+    return dict(content=hkl_data_str, filename='output.hkl'), no_upd
 
 
 @callback(

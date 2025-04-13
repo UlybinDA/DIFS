@@ -1,3 +1,5 @@
+
+
 class RunsDictError(Exception):
     def __init__(self,modal):
         self.error_modal_content = modal
@@ -12,5 +14,13 @@ class InstrumentError(Exception):
         self.error_modal_content = modal
 
 class HKLFormatError(Exception):
+    def __init__(self,modal):
+        self.error_modal_content = modal
+
+class NoScanDataError(Exception):
+    def __init__(self,modal):
+        self.error_modal_content = modal
+
+class WrongHKLShape(Exception):
     def __init__(self,modal):
         self.error_modal_content = modal

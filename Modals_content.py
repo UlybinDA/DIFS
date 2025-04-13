@@ -1,5 +1,7 @@
 from collections import namedtuple
 
+from PyInstaller.lib.modulegraph.modulegraph import header
+
 MODAL_TUPLE = namedtuple('Modal_content', 'header, body')
 
 delete_runs_empty_error = MODAL_TUPLE(header='Delete scans error',
@@ -125,11 +127,15 @@ check_dict_axes_out_of_range = MODAL_TUPLE(header='Load runs error',
                                 body="Axes indices is out of range")
 
 hkl_format_error = MODAL_TUPLE(header='Upload hkl error',
-                               body=".hkl file corrupted"
+                               body=".hkl file corrupted")
 
-)
+no_scan_data_to_save_error = MODAL_TUPLE(header='hkl data save error',
+                                         body='There is no data to save')
 
-
+wrong_hkl_array_shape = MODAL_TUPLE(header='hkl array shape error',
+                                         body='hkl array shape must be (x,3)')
+separate_unique_common_error = MODAL_TUPLE(header='Separate unique and common reflections',
+                                         body='There must be at least two runs.')
 
 
 

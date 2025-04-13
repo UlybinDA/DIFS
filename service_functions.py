@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 import re
+
+from pandas.core.computation.expr import intersection
+
 import rgb_colors
 from colorama import Back
 from main import Sample
@@ -13,9 +16,10 @@ from scipy.spatial.transform import Rotation as R
 import base64
 from CalcExperiment import Experiment
 import json
-from Exceptions import RunsDictError, HKLFormatError
+from Exceptions import RunsDictError, HKLFormatError, WrongHKLShape
 from Modals_content import *
 from encode_hkl import encode_hkl
+from functools import reduce
 from typing import Tuple, List, Dict, Union, Optional, Any
 
 
@@ -65,11 +69,6 @@ def cut_by_d(hkl_array: np.ndarray, d_range: List[float], parameters: List[float
     return hkl_array[bool_array[:, 0]]
 
 
-def hklf_array_with_orig_as_run(hkl_array: np.ndarray, original_hkl: np.ndarray) -> Tuple[
-    Tuple[None, np.ndarray, np.ndarray, None],]:
-    return ((None, hkl_array, original_hkl, None),)
-
-
 def generate_original_hkl_for_hkl_array(hkl_array: np.ndarray, pg: str, parameters: List[float],
                                         d_range: Optional[List[float]] = None, centring: str = 'P') -> np.ndarray:
     if not d_range:
@@ -108,9 +107,35 @@ def make_single_column_str_arr(array: np.ndarray) -> np.ndarray:
                        array[:, 2].astype(int).astype(str))
     return scsa
 
+def bool_intersecting_elements(arrays):
+    hkl_arrays_encoded = [encode_hkl(hkl) for hkl in arrays]
+    st_hkl_encoded = hkl_arrays_encoded[0]
+    common = set(st_hkl_encoded.copy())
+    for hkl in hkl_arrays_encoded[1:]:
+        common.intersection_update(hkl)
+        if not common:
+            break
+    bool_array = np.isin(st_hkl_encoded,np.array(tuple(common)))
+    return bool_array.reshape(-1,1)
+
+
+def bool_not_intersecting_hkl(hkl_array1, hkl_array2):
+    if not hkl_array1.shape[1] == 3 or not hkl_array1.shape[1] == 3:
+        raise WrongHKLShape(modal=wrong_hkl_array_shape)
+    hkl_encoded_array1 = encode_hkl(hkl_array1)
+    hkl_encoded_array2 = encode_hkl(hkl_array2)
+    boolarr1 = np.ones(len(hkl_encoded_array1)).astype(dtype=bool)
+    boolarr2 = np.ones(len(hkl_encoded_array2)).astype(dtype=bool)
+    intersection1, intersection2 = indices_of_common_elements(hkl_encoded_array1, hkl_encoded_array2)
+    boolarr1[intersection1] = False
+    boolarr2[intersection2] = False
+    return boolarr1.reshape(-1,1), boolarr2.reshape(-1,1)
+
 
 def indices_of_common_elements(array1: np.ndarray, array2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    rest, array1_indices, array2_indices = np.intersect1d(array1, array2, return_indices=True)
+    intersection = np.intersect1d(array1, array2)
+    array1_indices = np.where(np.isin(array1, intersection))[0]
+    array2_indices = np.where(np.isin(array2, intersection))[0]
     return array1_indices, array2_indices
 
 
@@ -537,21 +562,23 @@ def reduce_to_origin(run: Tuple[np.ndarray, ...]) -> Tuple[Tuple[None, np.ndarra
 
 def unite_runs_data(all_data: List[Tuple[np.ndarray, ...]], runs: Union[str, List[int]]) -> Tuple[
     np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    i = 0
     if runs == 'all':
         data = all_data[:]
     else:
-        data = all_data[runs]
+        data = [all_data[i] for i in runs]
+
+    angles_list, hkl_list, hkl_original_list, diff_vecs_list = [], [], [], []
 
     for run in data:
-        i += 1
-        if i == 1:
-            angles, hkl, hkl_original, diff_vecs = run
-        else:
-            angles = np.vstack((angles, run[0]))
-            hkl = np.vstack((hkl, run[1]))
-            hkl_original = np.vstack((hkl_original, run[2]))
-            diff_vecs = np.vstack((diff_vecs, run[3]))
+        angles_list.append(run[0])
+        hkl_list.append(run[1])
+        hkl_original_list.append(run[2])
+        diff_vecs_list.append(run[3])
+
+    angles = np.vstack(angles_list) if angles_list else None
+    hkl = np.vstack(hkl_list) if hkl_list else None
+    hkl_original = np.vstack(hkl_original_list) if hkl_original_list else None
+    diff_vecs = np.vstack(diff_vecs_list) if diff_vecs_list else None
 
     return (angles, hkl, hkl_original, diff_vecs)
 
@@ -653,7 +680,7 @@ def generate_multiplicity_plot(hkl_orig: np.ndarray, all_hkl_orig: np.ndarray, p
 
 
 def generate_redundancy_plot(hkl: np.ndarray, all_hkl_orig: np.ndarray, parameters: List[float], step: float = 0.1) -> \
-Tuple[np.ndarray, np.ndarray]:
+        Tuple[np.ndarray, np.ndarray]:
     d_hkl = create_d_array(parameters, hkl)
     d_all_hkl = create_d_array(parameters, all_hkl_orig)
     minimal = np.min(d_all_hkl)
@@ -1246,7 +1273,6 @@ def get_float_from_str(str_: str, all_: bool = False) -> Union[float, List[float
             return None
 
 
-
 def process_dcc_upload_json(contents: str) -> Dict[str, Any]:
     decoded_data = base64.b64decode(contents.split(',')[1])
     try:
@@ -1375,7 +1401,6 @@ def check_dict_value(dict_: Dict[str, Any], keys: Union[str, List[str]], classes
 
 def generate_data_for_detector_table(diameter: Optional[float] = None, height: Optional[float] = None,
                                      width: Optional[float] = None) -> List[Dict[str, Any]]:
-
     if diameter:
         data = [{'diameter_prm': diameter}, ]
     else:
@@ -1611,7 +1636,6 @@ def find_index(s: str, x: str, n: int) -> Optional[int]:
             count += 1
             if count == n: return i
     return None
-
 
 
 def check_obstacle_dict(dict_: Dict[str, Any]) -> bool:

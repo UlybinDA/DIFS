@@ -1,6 +1,8 @@
 import numpy as np
-from Exceptions import CollisionError, InstrumentError
-from Modals_content import instrument_error_no_goniometer, calc_collision_error, MODAL_TUPLE
+from pandas.core.computation.expr import intersection
+
+from Exceptions import CollisionError, InstrumentError, NoScanDataError
+from Modals_content import instrument_error_no_goniometer, calc_collision_error, MODAL_TUPLE, no_scan_data_to_save_error
 from main import Sample, Ray_obstacle
 import warnings
 import json
@@ -34,6 +36,7 @@ class Experiment():
         self.det_complex = False
         self.det_complex_format = None
         self.det_row_col_spacing = None
+        self.scan_data = None
 
     def set_wavelength(self, wavelength):
         self.wavelength = wavelength
@@ -155,7 +158,7 @@ class Experiment():
             report += check_failed
         return report
 
-    @mylogger(level='DEBUG',log_args=True)
+    @mylogger(level='DEBUG', log_args=True)
     def calc_experiment(self, d_range=None, hkl_section=None):
         if self.check_logic_collision and self.logic_collision is not None:
             self.check_collision_v2()
@@ -171,8 +174,7 @@ class Experiment():
                 self.centring_previous = self.centring
                 self.pg_previous = self.pg
                 self.d_range = d_range
-            else:
-                pass
+
             hkl_in = self.hkl_in_d_range
             hkl_origin_in = self.hkl_origin_in_d_range
 
@@ -250,8 +252,8 @@ class Experiment():
             d_array = sf.create_d_array(self.cell.parameters, hkl_array)
             d_min_ = min(d_array)
             d_max_ = max(d_array)
-            hkl_array_orig = sf.generate_original_hkl_for_hkl_array(hkl_array, pg=self.pg, parameters=self.parameters,
-                                                                    centring=self.centring)
+            hkl_array_orig = sf.generate_original_hkl_for_hkl_array(hkl_array, pg=pg, parameters=self.parameters,
+                                                                    centring=centring)
             data += [(None, hkl_array, hkl_array_orig, None), ]
             if d_min is None or d_min > d_min_: d_min = d_min_
             if d_max is None or d_max > d_max_: d_max = d_max_
@@ -260,6 +262,40 @@ class Experiment():
         self.hkl_in_d_range, self.hkl_origin_in_d_range = self.cell.gen_hkl_arrays(type='d_range', d_range=d_range,
                                                                                    return_origin=True, pg=self.pg,
                                                                                    centring=self.centring)
+
+    def _generate_unique_scan_data(self,scan1,scan2):
+        hkl1 = scan1[1]
+        hkl2 = scan2[1]
+        boolarr1, boolarr2 = sf.bool_not_intersecting_hkl(hkl1,hkl2)
+        unique1 = [data[boolarr1[:,0]] if not (data is None) else None for data in scan1]
+        unique2 = [data[boolarr2[:,0]] if not (data is None) else None for data in scan2]
+        return unique1, unique2
+
+
+    def separate_unique_common(self):
+        assert self.scan_data is not None and len(self.scan_data) >= 2, 'Provide at least 2 scan'
+        #TODO make appropriate error handling
+        unique_lists = []
+        for i, scan_main in enumerate(self.scan_data):
+            scan_unique_list = []
+            for j, scan_comparison in enumerate(self.scan_data):
+                if i!=j:
+                    unique_, rest = self._generate_unique_scan_data(scan_main,scan_comparison)
+                    scan_unique_list.append(unique_)
+                else:
+                    continue
+            unique_lists.append(scan_unique_list)
+        hkl_list = []
+        for scan in self.scan_data:
+            hkl_list.append(scan[1])
+        intersection_indices = sf.bool_intersecting_elements(hkl_list)
+        intersection_data = [data[intersection_indices[:,0]] if not (data is None) else None for data in self.scan_data[0]]
+        new_scan_data = []
+        for scan,unique_ in zip(self.scan_data,unique_lists):
+            new_scan_data.extend((scan,*unique_))
+        new_scan_data.append(intersection_data)
+        self.scan_data = new_scan_data
+
 
     def set_logic_collision(self, collision_list):
         self.logic_collision = collision_list
@@ -349,6 +385,12 @@ class Experiment():
         self.figs_1d = figs_1d
         return figs_1d
 
+    def visualize_hkl_data(self, data, visualise=True):
+        sf.visualize_scans_known_hkl(data, all_hkl=self.hkl_in_d_range,
+                                       all_hkl_orig=self.hkl_origin_in_d_range, visualise=visualise, trash_unknown=True, cryst_coord=True,
+                                     b_matr=self.cell.b_matrix,)
+        pass
+
     def generate_known_space_3d(self):
         fig = sf.visualize_scans_space(self.scan_data, all_hkl=self.hkl_in_d_range,
                                        all_hkl_orig=self.hkl_origin_in_d_range, pg=self.pg, visualise=False,
@@ -357,9 +399,9 @@ class Experiment():
         self.known_space = fig
         return fig
 
-    def generate_known_hkl_3d(self):
+    def generate_known_hkl_3d(self,visualise=False):
         fig = sf.visualize_scans_known_hkl(scans=self.scan_data, all_hkl=self.hkl_in_d_range,
-                                           all_hkl_orig=self.hkl_origin_in_d_range, visualise=False,
+                                           all_hkl_orig=self.hkl_origin_in_d_range, visualise=visualise,
                                            trash_unknown=False,
                                            cryst_coord=False, b_matr=self.cell.b_matrix, )
         self.known_hkl = fig
@@ -446,6 +488,19 @@ class Experiment():
             return data, 'Circle'
         return False
 
+    def form_scan_data_as_hkl(self):
+        if not self.scan_data:
+            raise NoScanDataError(modal=no_scan_data_to_save_error)
+
+        hkl_arrays_list = [scan[1] for scan in self.scan_data]
+        hkl_array = np.vstack(hkl_arrays_list)
+        lines = []
+        for hkl in hkl_array:
+            line = f'{hkl[0]: >4}{hkl[1]: >4}{hkl[2]: >4}{1.00: >8}{1.00: >8}\n'
+            lines.append(line)
+
+        return ''.join(lines)
+
     def _load_goniometer(self, data_):
         dicts_check = all((sf.check_goniometer_dict(axis) for axis in data_))
         if dicts_check:
@@ -510,7 +565,6 @@ class Experiment():
     def check_collision_v2(self, scans=None, type_='highest'):
         scans = self.scans if scans is None else scans
 
-        conditions_not_met = list()
         global_flag = True
         collisions = {}
         for scan_n, scan in enumerate(scans):
@@ -594,25 +648,30 @@ import service_functions as sf
 
 if __name__ == '__main__':
     exp2 = Experiment()
-    UB = np.array([
-    [0.06891929728619765,0.14464167698858027,0.011934602905963624],
-    [0.01812656599689835,0.00830891460414493 ,0.0759630322017482],
-    [-0.13105621015000704, 0.005086831810771183,-0.0040671054185817],
-    ])
-    exp2.set_cell(matr=UB)
+    # UB = np.array([
+    # [0.06891929728619765,0.14464167698858027,0.011934602905963624],
+    # [0.01812656599689835,0.00830891460414493 ,0.0759630322017482],
+    # [-0.13105621015000704, 0.005086831810771183,-0.0040671054185817],
+    # ])
+    exp2.set_cell(parameters=(5, 5, 5, 90, 90, 90), om_chi_phi=(0, 0, 0))
     exp2.set_pg('1')
     exp2.set_centring('P')
     exp2.set_wavelength(0.71)
     exp2.set_goniometer('zyzyz', axes_directions=[1, -1, 1, 1, 1], axes_real=['true', 'false', 'true', 'false', 'true'],
                         axes_angles=[0, 54.8, 0, 54.8, 0], axes_names=['phi', 'al_n', 'kappa', 'al_n', 'omega'])
     exp2.add_scan(det_dist=95,det_angles=[0,0,25],det_orientation='normal',axes_angles=[0,54.8,0,54.8,-65],scan=5,sweep=180,)
-
-    # with open('Tongda_TD5000__collision_logic.json', 'r') as f:
-    #     collision = json.load(f)
+    exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=[0, 54.8, 60, 54.8, -65],
+                  scan=5, sweep=180)
+    exp2.calc_experiment(d_range=(0.68, 50))
+    # hkl_text = exp2.form_scan_data_as_hkl()
+    #
+    # with open('hkl_out2.hkl', 'w') as f:
+    #     f.write(hkl_text)
+    exp2.separate_unique_common()
+    exp2.generate_known_hkl_3d(visualise=True)
     # exp1.set_logic_collision(collision)
     # exp1.check_collision_v2()
 
-    exp2.calc_experiment((0.75,50))
     # with open('image_.hkl','r') as f:
     #     str = f.read()
     # exp2.load_hkls([str],)
