@@ -1,5 +1,4 @@
 import numpy as np
-from pandas.core.computation.expr import intersection
 
 from Exceptions import CollisionError, InstrumentError, NoScanDataError
 from Modals_content import instrument_error_no_goniometer, calc_collision_error, MODAL_TUPLE, no_scan_data_to_save_error
@@ -80,6 +79,7 @@ class Experiment():
         else:
             return False
 
+    @mylogger(log_args=True)
     def set_detector_param(self, det_geometry, det_height=None, det_width=None, det_diameter=None, det_complex=False,
                            det_complex_format=None, det_row_col_spacing=None):
         assert det_geometry == 'rectangle' or det_geometry == 'circle', 'geometry should be rectangle or circle'
@@ -88,6 +88,7 @@ class Experiment():
             self.det_height, self.det_width, self.det_diameter = det_height, det_width, None
             if det_complex:
                 self.det_complex = True
+                det_complex_format = tuple(int(i) for i in det_complex_format)
                 self.det_complex_format, self.det_row_col_spacing = det_complex_format, det_row_col_spacing
             else:
                 self.det_complex = False
@@ -437,7 +438,7 @@ class Experiment():
         data_json = json.dumps(data_, ensure_ascii=False, indent=4)
 
         return data_json
-
+    @mylogger(log_args=True)
     def load_instrument_unit(self, data_, object_, extra=None):
         objects = ['obstacles', 'detector', 'goniometer', 'wavelength']
         assert object_ in objects, f'object of export may be: {(", ").join(objects)}'
@@ -481,8 +482,12 @@ class Experiment():
         if dict_check:
             self.set_detector_param(**data_)
             if data_['det_geometry'] == 'rectangle':
-                data = sf.generate_data_for_detector_table(width=data_['det_width'], height=data_['det_height'])
-                return data, 'Rectangle'
+                if not data_.get('det_complex',None):
+                    data = sf.generate_data_for_detector_table(width=data_['det_width'], height=data_['det_height'])
+                    return data, 'Rectangle'
+                else:
+                    data = sf.generate_data_for_detector_table(width=data_['det_width'], height=data_['det_height'])
+                    return data, 'Rectangle'
             else:
                 data = sf.generate_data_for_detector_table(diameter=data_['det_diameter'])
             return data, 'Circle'
@@ -521,7 +526,7 @@ class Experiment():
             return table_data, axes_real, axes_angles
         else:
             return False
-
+    @mylogger(log_args=True)
     def load_instrument(self, data_, extra=None):
         wavelength = data_.get('wavelength', None)
         goniometer = data_.get('goniometer', None)
@@ -648,12 +653,12 @@ import service_functions as sf
 
 if __name__ == '__main__':
     exp2 = Experiment()
-    # UB = np.array([
-    # [0.06891929728619765,0.14464167698858027,0.011934602905963624],
-    # [0.01812656599689835,0.00830891460414493 ,0.0759630322017482],
-    # [-0.13105621015000704, 0.005086831810771183,-0.0040671054185817],
-    # ])
-    exp2.set_cell(parameters=(5, 5, 5, 90, 90, 90), om_chi_phi=(0, 0, 0))
+    UB = np.array([
+    [0.1368201929280981,0.060011227906668546,0.010586197582489777],
+    [0.04830454979486818,-0.010060152625814183 ,-0.0517391533494995],
+    [0.08396030443761454, -0.09233159599224587,0.012557357685732412],
+    ])
+    exp2.set_cell(matr=UB)
     exp2.set_pg('1')
     exp2.set_centring('P')
     exp2.set_wavelength(0.71)
@@ -662,6 +667,7 @@ if __name__ == '__main__':
     exp2.add_scan(det_dist=95,det_angles=[0,0,25],det_orientation='normal',axes_angles=[0,54.8,0,54.8,-65],scan=5,sweep=180,)
     exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=[0, 54.8, 60, 54.8, -65],
                   scan=5, sweep=180)
+    exp2.set_detector_param(det_geometry='rectangle',det_height=179.396,det_width=168.732,det_complex=True,det_complex_format=(5,2),det_row_col_spacing=(2.924,1.204))
     exp2.calc_experiment(d_range=(0.68, 50))
     # hkl_text = exp2.form_scan_data_as_hkl()
     #

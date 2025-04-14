@@ -1,6 +1,5 @@
 from collections import namedtuple
 
-from PyInstaller.lib.modulegraph.modulegraph import header
 
 MODAL_TUPLE = namedtuple('Modal_content', 'header, body')
 

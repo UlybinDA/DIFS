@@ -41,9 +41,17 @@
     ],
     "detector": {
         "det_geometry": "rectangle",
-        "det_complex": false,
-        "det_height": 170.0,
-        "det_width": 100.0
+        "det_complex": true,
+        "det_height": 179.396,
+        "det_width": 168.732,
+        "det_complex_format": [
+            5,
+            2
+        ],
+        "det_row_col_spacing": [
+            2.924,
+            1.204
+        ]
     },
     "obstacles": [
         {
@@ -60,7 +68,7 @@
             "rotation_z": 0,
             "name": "bs"
         },
-	{
+        {
             "distance": 10,
             "geometry": "rectangle",
             "orientation": "independent",

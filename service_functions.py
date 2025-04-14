@@ -1329,16 +1329,17 @@ def check_detector_dict(dict_: Dict[str, Any]) -> bool:
         if not all((check_dict_value(dict_, 'det_height', (int, float), higher=0),
                     check_dict_value(dict_, 'det_width', (int, float), higher=0),
                     check_dict_value(dict_, 'det_complex', (bool,)))): return False
-        if not dict_['det_complex']:
+        if not dict_.get('det_complex', None):
             return True
         else:
             try:
                 if not dict_has_keys(dict_, ['det_complex_format', 'det_row_col_spacing'], exact_keys=False):
                     return False
-                bool_ = all(len(dict_['det_complex_format']) == 2, len(dict_['det_complex_format']) == 2,
+                bool_ = all((len(dict_['det_complex_format']) == 2, len(dict_['det_row_col_spacing']) == 2,
                             dict_['det_complex_format'][0] > 0, dict_['det_complex_format'][1] > 0,
                             type(dict_['det_complex_format'][0]) is int, type(dict_['det_complex_format'][1]) is int,
-                            dict_['det_row_col_spacing'][0] > 0, dict_['det_row_col_spacing'][1] > 0)
+                            dict_['det_row_col_spacing'][0] > 0, dict_['det_row_col_spacing'][1] > 0))
+
             except:
                 return False
             if bool_:
