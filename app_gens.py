@@ -17,7 +17,7 @@ def generate_choose_scan_dropdown(exp_inst, id_, style, style_cell):
         fill_width=False,
         dropdown={
             'x_axis': {
-                'options': [{'label': f'{name}', 'value': no + 1} for
+                'options': [{'label': f'{name}', 'value': no } for
                             no, name in enumerate(exp_inst.axes_names) if real_axes[no] == 'true']}, },
         id=f'{id_}'
     ),
@@ -199,7 +199,7 @@ def gen_run_table(real_axes, axes_angles, rotations, names, table_num, data=None
 
     for no, rot in enumerate(rotations):
         if real_axes[no] == 'true':
-            dropdown_options_list += [{'label': f'{names[no]}', 'value': f'{no + 1}'}, ]
+            dropdown_options_list += [{'label': f'{names[no]}', 'value': f'{no }'}, ]
     if data is None:
         dict_for_table = {
             f'{table_num}scan_no': '',
@@ -234,28 +234,28 @@ def gen_run_table(real_axes, axes_angles, rotations, names, table_num, data=None
 
     if data is None:
         for num, rot in enumerate(rotations):
-            dict_for_table[f'{table_num}_{num + 1}_rot'] = 0
-            dict_for_table.update({f'{table_num}_{num + 1}_rot': axes_angles[num]})
+            dict_for_table[f'{table_num}_{num}_rot'] = 0
+            dict_for_table.update({f'{table_num}_{num}_rot': axes_angles[num]})
             if real_axes[num] == 'true':
                 columns_list1.append(
-                    {'id': f'{table_num}_{num + 1}_rot', 'name': f'{names[num]}', 'type': 'numeric',
+                    {'id': f'{table_num}_{num}_rot', 'name': f'{names[num]}', 'type': 'numeric',
                      'format': Format(precision=2, scheme=Scheme.decimal_integer)})
 
             elif real_axes[num] == 'false':
                 columns_list1.append(
-                    {'id': f'{table_num}_{num + 1}_rot', 'name': f'{names[num]}', 'type': 'numeric',
+                    {'id': f'{table_num}_{num}_rot', 'name': f'{names[num]}', 'type': 'numeric',
                      'format': Format(precision=2, scheme=Scheme.decimal_integer), 'editable': False})
     else:
         dict_for_table = data
         for num, rot in enumerate(rotations):
             if real_axes[num] == 'true':
                 columns_list1.append(
-                    {'id': f'{table_num}_{num + 1}_rot', 'name': f'{names[num]}', 'type': 'numeric',
+                    {'id': f'{table_num}_{num}_rot', 'name': f'{names[num]}', 'type': 'numeric',
                      'format': Format(precision=2, scheme=Scheme.decimal_integer)})
 
             elif real_axes[num] == 'false':
                 columns_list1.append(
-                    {'id': f'{table_num}_{num + 1}_rot', 'name': f'{names[num]}', 'type': 'numeric',
+                    {'id': f'{table_num}_{num}_rot', 'name': f'{names[num]}', 'type': 'numeric',
                      'format': Format(precision=2, scheme=Scheme.decimal_integer), 'editable': False})
 
     columns_list1 = columns_list1 + columns_list2

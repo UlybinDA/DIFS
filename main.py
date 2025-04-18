@@ -260,11 +260,6 @@ class Ray_obstacle():
             data_rear += self.array_slice(array, mask_rear, 'true')
         return (data_front, data_rear)
 
-    def filter_anvil(self, diff_vecs, diff_angles, anvil_normal, goniometer_axes, initial_axes_angles, scan_axis_num,
-                     data):
-
-        pass
-
     @staticmethod
     def vecs_bw_vecs4(vecs: np.ndarray,
                       vecs4: np.ndarray) -> np.ndarray:
@@ -417,6 +412,23 @@ class Ray_obstacle():
             back_wall_marker = np.vstack((np.zeros((data[0].shape[0], 1)), np.ones((data[1].shape[0], 1))))
             data_output = data + (intensity, back_wall_marker)
             return data_output
+
+    def filter_anvil(self,
+                     diff_vecs: np.ndarray,
+                     diff_angles: np.ndarray,
+                     anvil_normal: np.ndarray,
+                     goniometer_axes: str,
+                     initial_axes_angles: Tuple[float, ...],
+                     scan_axis_index: int,
+                     data: Tuple[np.ndarray, ...],
+                     half_angle: float,
+                     mode: str):
+
+        cos_max_ang = np.cos(np.deg2rad(half_angle))
+        mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
+        n_reflections = diff_vecs.shape[0]
+
+        pass
 
     def filter_stat_rev_samp(self,
                              diff_vecs: np.ndarray,
@@ -729,7 +741,8 @@ class Sample():
         angle = np.arccos(dot_prod / np.linalg.norm(vec1) / np.linalg.norm(vec2))
         return np.rad2deg(angle)
 
-    def generate_rotation_matrices(self,
+    @staticmethod
+    def generate_rotation_matrices(
                                    rotations: str = 'zxz',
                                    directions: Tuple[int, int, int] = (1, -1, 1),
                                    angle: Tuple[float, float, float] = (1., 2., 3.),
@@ -744,7 +757,7 @@ class Sample():
             matr3 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
             return (matr1, matr3)
         else:
-            if no_of_scan == 1:
+            if no_of_scan == 0:
                 matr1 = R.from_matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
                 rotations1 = rotations[1:][::-1]
                 angle1 = angle[1:][::-1]
@@ -754,7 +767,7 @@ class Sample():
                 matr3 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
                 return (matr1.as_matrix(), matr3)
 
-            elif no_of_scan == num_of_rots:
+            elif no_of_scan + 1 == num_of_rots:
                 matr1 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
                 matr3 = R.from_matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
                 rotations3 = rotations[:-1][::-1]
@@ -763,7 +776,7 @@ class Sample():
                     matr3 = matr3 * R.from_euler(rotations3[i], angle3[i])
                 return (matr1, matr3.as_matrix())
 
-            elif no_of_scan != 1 and no_of_scan != num_of_rots:
+            elif no_of_scan != 0 and no_of_scan +1 != num_of_rots:
                 matr1 = R.from_matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
                 rotations1 = rotations[no_of_scan:][::-1]
                 angle1 = angle[no_of_scan:][::-1]
@@ -771,8 +784,8 @@ class Sample():
                     matr1 = matr1 * R.from_euler(rotations1[i], angle1[i])
 
                 matr3 = R.from_matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-                rotations3 = rotations[:no_of_scan - 1][::-1]
-                angle3 = angle[:no_of_scan - 1][::-1]
+                rotations3 = rotations[:no_of_scan][::-1]
+                angle3 = angle[:no_of_scan][::-1]
                 for i in range(len(rotations3)):
                     matr3 = matr3 * R.from_euler(rotations3[i], angle3[i])
 
@@ -864,15 +877,15 @@ class Sample():
             cos_si_ki: np.ndarray) -> Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
 
         matr13 = self.generate_rotation_matrices(rotations, directions, angle, no_of_scan)
-        c = self.coefficient_z(matr13, vectors, scan=rotations[no_of_scan - 1])
-        if directions[no_of_scan - 1] == 1:
+        c = self.coefficient_z(matr13, vectors, scan=rotations[no_of_scan])
+        if directions[no_of_scan] == 1:
             angle1 = -2 * np.arctan(
                 (c[2] - np.sqrt(-c[0] ** 2 - 2 * c[0] * cos_si_ki + c[1] ** 2 + c[2] ** 2 - cos_si_ki ** 2)) / (
                         c[0] - c[1] + cos_si_ki))
             angle2 = -2 * np.arctan(
                 (c[2] + np.sqrt(-c[0] ** 2 - 2 * c[0] * cos_si_ki + c[1] ** 2 + c[2] ** 2 - cos_si_ki ** 2)) / (
                         c[0] - c[1] + cos_si_ki))
-        elif directions[no_of_scan - 1] == -1:
+        elif directions[no_of_scan] == -1:
             angle1 = 2 * np.arctan(
                 (c[2] - np.sqrt(-c[0] ** 2 - 2 * c[0] * cos_si_ki + c[1] ** 2 + c[2] ** 2 - cos_si_ki ** 2)) / (
                         c[0] - c[1] + cos_si_ki))
@@ -1032,7 +1045,7 @@ class Sample():
         hkl_array_norm = np.hstack((hkl_array_norm, cos_s_ki_ang_array))
 
         if scan_type == '???':
-            angle_start = angles[no_of_scan - 1]
+            angle_start = angles[no_of_scan]
             range = self.angle_range(scan_sweep, angle_start)
             hkl_array = hkl_array.reshape(-1, 3)
             T = hkl_array_norm[:, -1]
@@ -1062,10 +1075,10 @@ class Sample():
             angle1 = angle1[~np.isnan(angle1)].reshape(-1, 1)
             angle2 = angle2[~np.isnan(angle2)].reshape(-1, 1)
 
-            rotation1 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan - 1],
-                                                            angle1 * directions[no_of_scan - 1]) * R.from_matrix(matr3)
-            rotation2 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan - 1],
-                                                            angle2 * directions[no_of_scan - 1]) * R.from_matrix(matr3)
+            rotation1 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
+                                                            angle1 * directions[no_of_scan]) * R.from_matrix(matr3)
+            rotation2 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
+                                                            angle2 * directions[no_of_scan]) * R.from_matrix(matr3)
 
             hkl_rotated1 = rotation1.apply(hkl_rotated1)
             hkl_rotated2 = rotation2.apply(hkl_rotated2)
@@ -1074,9 +1087,9 @@ class Sample():
             diff_vec2 = hkl_rotated2 + np.array([1 / wavelength, 0, 0])
 
             angles_all = np.vstack((angle1, angle2))
-            rotations_all = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan - 1],
+            rotations_all = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
                                                                 angles_all * directions[
-                                                                    no_of_scan - 1]) * R.from_matrix(matr3)
+                                                                    no_of_scan]) * R.from_matrix(matr3)
             hkl_all = np.vstack((hkl_array1, hkl_array2))
             hkl_array_orig_all = np.vstack((hkl_array_orig1, hkl_array_orig2))
             diff_vec_all = np.vstack((diff_vec1, diff_vec2))
@@ -1090,16 +1103,16 @@ class Sample():
                        directions: Tuple[int, int, int],
                        n_of_scan: int) -> np.ndarray:
 
-        if directions[n_of_scan - 1] == 'x':
+        if directions[n_of_scan] == 'x':
             scan_axis = np.array([1, 0, 0])
-        elif directions[n_of_scan - 1] == 'y':
+        elif directions[n_of_scan] == 'y':
             scan_axis = np.array([0, 1, 0])
         else:
             scan_axis = np.array([0, 0, 1])
 
-        vec_rotations = rotations[:n_of_scan - 1][::-1]
+        vec_rotations = rotations[:n_of_scan][::-1]
         angles = list(np.array(angles) * np.array(directions))
-        angles_rotation = angles[:n_of_scan - 1][::-1]
+        angles_rotation = angles[:n_of_scan][::-1]
         if len(vec_rotations) == 0:
             pass
         else:
@@ -1146,9 +1159,9 @@ class Sample():
         n_of_reflections = reflections.shape[0]
         first = True
         for anglez in z_range:
-            angles_[rotation_directions[2] - 1] = anglez
+            angles_[rotation_directions[2]] = anglez
             for anglex in x_range:
-                angles_[rotation_directions[1] - 1] = anglex
+                angles_[rotation_directions[1]] = anglex
 
                 angle1, angle2 = self.scan(scan_type='???', scan_sweep=360, rotations=rotations, angles=angles_,
                                            directions=directions, no_of_scan=rotation_directions[0],
@@ -1215,7 +1228,7 @@ class Sample():
         n_of_reflections = reflections.shape[0]
         first = True
         for anglex in x_range:
-            angles_[rotation_directions[1] - 1] = anglex
+            angles_[rotation_directions[1]] = anglex
             angle1, angle2 = self.scan(scan_type='???', scan_sweep=360, rotations=rotations, angles=angles_,
                                        directions=directions, no_of_scan=rotation_directions[0], hkl_array=reflections,
                                        hkl_array_orig=reflections, wavelength=wavelength, only_angles=True)

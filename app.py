@@ -2613,13 +2613,13 @@ def map_switch(value):
                 fill_width=False,
                 dropdown={
                     'x_axis': {
-                        'options': [{'label': f'{name}', 'value': no + 1} for
+                        'options': [{'label': f'{name}', 'value': no} for
                                     no, name in enumerate(exp1.axes_names) if real_axes[no] == 'true']},
                     'y_axis': {
-                        'options': [{'label': f'{name}', 'value': no + 2} for
+                        'options': [{'label': f'{name}', 'value': no + 1} for
                                     no, name in enumerate(exp1.axes_names[1:]) if real_axes[1:][no] == 'true']},
                     'z_axis': {
-                        'options': [{'label': f'{name}', 'value': no + 1} for
+                        'options': [{'label': f'{name}', 'value': no} for
                                     no, name in enumerate(exp1.axes_names) if real_axes[no] == 'true']},
                 },
                 id='map3d_axes_table'
@@ -2680,10 +2680,10 @@ def map_switch(value):
                 fill_width=False,
                 dropdown={
                     'x_axis': {
-                        'options': [{'label': f'{name}', 'value': no + 1} for
+                        'options': [{'label': f'{name}', 'value': no } for
                                     no, name in enumerate(exp1.axes_names) if real_axes[no] == 'true']},
                     'y_axis': {
-                        'options': [{'label': f'{name}', 'value': no + 2} for
+                        'options': [{'label': f'{name}', 'value': no + 1} for
                                     no, name in enumerate(exp1.axes_names[1:]) if real_axes[1:][no] == 'true']},
                 },
                 id='map2d_axes_table'
@@ -2741,7 +2741,7 @@ def map_switch(value):
                 fill_width=False,
                 dropdown={
                     'y_axis': {
-                        'options': [{'label': f'{name}', 'value': no + 1} for
+                        'options': [{'label': f'{name}', 'value': no } for
                                     no, name in enumerate(exp1.axes_names) if real_axes[no] == 'true']},
 
                 },
@@ -2813,10 +2813,11 @@ def calculate_diff_map(n_clicks, map_type, data_container):
             np.random.shuffle(selected_reflections)
             reflections = selected_reflections[: N_OF_RAND_REF, :3]
         yxz_axes = (axes_data['y_axis'], axes_data['x_axis'], axes_data['z_axis'])
+        print(yxz_axes)
         angles = list(angles_data.values())
         range_x, step_x = [(range_step_data['x_min'], range_step_data['x_max']), range_step_data['x_step']]
         range_z, step_z = [(range_step_data['z_min'], range_step_data['z_max']), range_step_data['z_step']]
-        names = (exp1.axes_names[yxz_axes[0] - 1], exp1.axes_names[yxz_axes[1] - 1], exp1.axes_names[yxz_axes[2] - 1])
+        names = (exp1.axes_names[yxz_axes[0] ], exp1.axes_names[yxz_axes[1] ], exp1.axes_names[yxz_axes[2] ])
 
         fig = exp1.cell.mapv2(reflections, rotations=exp1.axes_rotations, angles=angles,
                               directions=exp1.axes_directions, rotation_directions=yxz_axes, steps=(step_x, step_z),
@@ -2835,7 +2836,7 @@ def calculate_diff_map(n_clicks, map_type, data_container):
         yx_axes = (axes_data['y_axis'], axes_data['x_axis'])
         angles = list(angles_data.values())
         range_x, step_x = [(range_step_data['x_min'], range_step_data['x_max']), range_step_data['x_step']]
-        names = (exp1.axes_names[yx_axes[0] - 1], exp1.axes_names[yx_axes[1] - 1])
+        names = (exp1.axes_names[yx_axes[0] ], exp1.axes_names[yx_axes[1] ])
         fig = exp1.cell.map_2d(reflections, rotations=exp1.axes_rotations, angles=angles,
                                directions=exp1.axes_directions, rotation_directions=yx_axes, step=step_x,
                                range_x=range_x, wavelength=exp1.wavelength,
@@ -2848,7 +2849,7 @@ def calculate_diff_map(n_clicks, map_type, data_container):
 
         y_axis = axes_data['y_axis']
         angles = list(angles_data.values())
-        name = exp1.axes_names[y_axis - 1]
+        name = exp1.axes_names[y_axis ]
         fig = exp1.cell.map_1d(reflections, original_hkl=hkl_orig, rotations=exp1.axes_rotations, angles=angles,
                                directions=exp1.axes_directions, rotation_direction=y_axis, wavelength=exp1.wavelength,
                                name=name, visualise=False)
@@ -2871,7 +2872,7 @@ def generate_choose_scan_dropdown(id_, style, style_cell):
         fill_width=False,
         dropdown={
             'x_axis': {
-                'options': [{'label': f'{name}', 'value': no + 1} for
+                'options': [{'label': f'{name}', 'value': no} for
                             no, name in enumerate(exp1.axes_names) if real_axes[no] == 'true']}, },
         id=f'{id_}'
     ),
@@ -2934,7 +2935,7 @@ def calc_1d_section(relayoutdata, map_type, data_container, fig):
     angles_data = data_container['props']['children'][1]['props']['children']['props']['data'][0]
     angles = list(angles_data.values())
     axis = axes_data['y_axis']
-    angles[axis - 1] = start_angle
+    angles[axis ] = start_angle
     n_of_ref = int(np.array(fig['data'][0]['customdata'])[:, :3].shape[0] / 2)
     reflections = np.array(fig['data'][0]['customdata'])[:n_of_ref, :3]
     reflections_orig = np.array(fig['data'][0]['customdata'])[:n_of_ref, 3:]

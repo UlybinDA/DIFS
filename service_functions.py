@@ -1518,7 +1518,7 @@ def extract_run_data_into_list(dict_: Dict[str, Any]) -> Dict[str, Any]:
     order = []
     for axis in dict_['axes']:
         angles.append(axis['angle'])
-        order.append(axis['number'] - 1)
+        order.append(axis['number'] )
     axes_angles = [angles[i] for i in order]
     run = {
         'det_dist': dict_['detector']['det_dist'],
@@ -1578,14 +1578,14 @@ def check_run_dict(exp_inst, dict_):
     axes_nums = []
 
     for num, axis in enumerate(dict_['axes']):
-        if axis['angle'] != axes_angles[axis['number'] - 1] and axes_real[axis['number'] - 1] == 'false':
+        if axis['angle'] != axes_angles[axis['number'] ] and axes_real[axis['number'] ] == 'false':
             raise RunsDictError(load_runs_axes_angle_error)
         print(axis['number'])
         axes_nums.append(axis['number'])
     axes_nums.sort()
     if len(axes_nums) != len(set(axes_nums)):
         raise RunsDictError(check_dict_axes_repeating)
-    if exp_inst.axes_real[dict_['scan_n'] - 1] == 'false':
+    if exp_inst.axes_real[dict_['scan_n'] ] == 'false':
         raise RunsDictError(check_dict_error_fake_scan)
     if len(dict_['axes']) != len(exp_inst.axes_rotations):
         raise RunsDictError(check_dict_axes_n_mismatch)

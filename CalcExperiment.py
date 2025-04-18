@@ -321,7 +321,7 @@ class Experiment():
         conditions_not_met = list()
         global_flag = True
         for scan_n, scan in enumerate(scans):
-            scan_name = self.axes_names[int(scan[4]) - 1]
+            scan_name = self.axes_names[int(scan[4])]
             additional_operations = {'abs': abs}
             angles_dict = dict(zip(self.axes_names, scan[3]))
             variables_dict = {'d_dist': scan[0], 'det_ang_x': scan[1][0], 'det_ang_y': scan[1][1],
@@ -343,7 +343,7 @@ class Experiment():
                         break
                     block_flag = False
                 if not block_flag:
-                    conditions_not_met += [[scan_n + 1, block]]
+                    conditions_not_met += [[scan_n , block]]
                     global_flag = False
         if not global_flag:
             report_body_add = self.create_report(conditions_not_met)
@@ -573,7 +573,7 @@ class Experiment():
         global_flag = True
         collisions = {}
         for scan_n, scan in enumerate(scans):
-            scan_name = self.axes_names[int(scan[4]) - 1]
+            scan_name = self.axes_names[int(scan[4])]
             additional_operations = {'abs': abs}
             angles_dict = dict(zip(self.axes_names, scan[3]))
             variables_dict = {'d_dist': scan[0], 'det_ang_x': scan[1][0], 'det_ang_y': scan[1][1],
@@ -612,7 +612,7 @@ class Experiment():
         report_str = ''
         for scan in report_list.keys():
             highest_level = min((i['level'] for i in report_list[scan]))
-            report_str += f'scan_{scan + 1}:\n'
+            report_str += f'scan_{scan }:\n'
             for report in report_list[scan]:
                 if type_ == 'highest' and report['level'] == highest_level:
                     report_str += f'{report["name"]}:\n{report["problem"]}\n'
