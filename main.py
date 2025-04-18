@@ -260,6 +260,11 @@ class Ray_obstacle():
             data_rear += self.array_slice(array, mask_rear, 'true')
         return (data_front, data_rear)
 
+    def filter_anvil(self, diff_vecs, diff_angles, anvil_normal, goniometer_axes, initial_axes_angles, scan_axis_num,
+                     data):
+
+        pass
+
     @staticmethod
     def vecs_bw_vecs4(vecs: np.ndarray,
                       vecs4: np.ndarray) -> np.ndarray:
@@ -662,10 +667,7 @@ class Sample():
                  om: Optional[float] = None,
                  phi: Optional[float] = None,
                  chi: Optional[float] = None,
-                 wavelenght: float = 0.71,
-                 ka1: float = 0.70931715,
-                 ka2: float = 0.713607,
-                 point_symmetry_class: str = '1'):
+                 ):
 
         if orient_matx is not None:
             self.orient_matx = orient_matx

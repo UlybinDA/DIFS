@@ -197,7 +197,7 @@ first_page = html.Div([
         ),
         dcc.Upload(html.Button('Upload_UB', style={'display': 'inline-block'}), id='upload_ub',
                    accept='.p4p, .par, .txt',
-                   multiple=False, max_size=500000),
+                   multiple=False, max_size=5000000),
 
     ],
         style={
@@ -2040,7 +2040,7 @@ def set_runs(n_clicks, data, children):
         except RunsDictError as e:
             return (list((True, e.error_modal_content.header, e.error_modal_content.body)), {'background-color': 'red'},
                     no_upd)
-
+    exp1.scans = list()
     for run in data_:
         exp1.add_scan(**run)
     return list((False, '', '')), {'background-color': 'green'}, children

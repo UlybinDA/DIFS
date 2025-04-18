@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objs as go
 import re
 
-from pandas.core.computation.expr import intersection
 
 import rgb_colors
 from colorama import Back
@@ -19,7 +18,6 @@ import json
 from Exceptions import RunsDictError, HKLFormatError, WrongHKLShape
 from Modals_content import *
 from encode_hkl import encode_hkl
-from functools import reduce
 from typing import Tuple, List, Dict, Union, Optional, Any
 
 
@@ -1209,8 +1207,8 @@ def logic_eval(string_expression: str, variables: Dict[str, Any] = {}) -> bool:
 def parse_p4p_for_UB(str_data: str) -> Optional[np.ndarray]:
     try:
         lines_list = str_data.split('\n')
-        lines_orts = [i for i in lines_list if 'ORT' in i]
-        ub_components = [[float(i[9:25]), float(i[25:41]), float(i[41:57])] for i in lines_orts]
+        lines_orts = [i.split() for i in lines_list if 'ORT' in i]
+        ub_components = [[float(i[1]), float(i[2]), float(i[3])] for i in lines_orts]
         ub_matrix = np.array(ub_components)
         return ub_matrix
     except:
@@ -1238,8 +1236,8 @@ def parse_par_for_UB(str_data: str, to_angstroms: bool = True) -> Optional[np.nd
                 else:
                     continue
 
-        ub_components = next([i[20:40], i[41:61], i[62:82], i[83:103], i[104:124], i[125:145], i[146:166], i[167:187],
-                              i[188:208]] for i in lines_list if 'CRYSTALLOGRAPHY UB' in i and not '§' in i)
+        ub_line = next(i for i in lines_list if 'CRYSTALLOGRAPHY UB' in i and not '§' in i).split()
+        ub_components = ub_line[2:]
         ub_components = [float(i) for i in ub_components]
         ub_matrix = np.array(ub_components).reshape(3, 3)
         if to_angstroms: ub_matrix /= wavelength
