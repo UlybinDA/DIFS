@@ -8,3 +8,4 @@ pandas==2.2.3
 plotly==5.24.0
 psutil==6.1.0
 scipy==1.14.1
+nptyping

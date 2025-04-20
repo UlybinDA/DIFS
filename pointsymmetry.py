@@ -1,5 +1,3 @@
-import time
-import pandas as pd
 import numpy as np
 from my_logger import mylogger
 from encode_hkl import encode_hkl
@@ -830,7 +828,6 @@ def generate_orig_hkl_array(h, k, l, pg, centring):
 
 @mylogger('DEBUG')
 def generate_hkl_by_pg(hkl_orig_array,pg_key):
-    start = time.time()
     hkl_array = hkl_orig_array.copy().reshape(-1, 3, 1)
     general_positions = PG_GENS[pg_key]
     hkl_orig_array = hkl_orig_array.reshape(-1, 3, 1)

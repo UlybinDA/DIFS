@@ -24,3 +24,8 @@ class NoScanDataError(Exception):
 class WrongHKLShape(Exception):
     def __init__(self,modal):
         self.error_modal_content = modal
+
+class DiamondAnvilError(Exception):
+    def __init__(self,modal):
+        self.error_modal_content = modal
+        print(modal.body)

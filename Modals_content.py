@@ -133,9 +133,14 @@ no_scan_data_to_save_error = MODAL_TUPLE(header='hkl data save error',
 
 wrong_hkl_array_shape = MODAL_TUPLE(header='hkl array shape error',
                                          body='hkl array shape must be (x,3)')
+
 separate_unique_common_error = MODAL_TUPLE(header='Separate unique and common reflections',
                                          body='There must be at least two runs.')
 
+aperture_value_error =  MODAL_TUPLE(header='Diamond anvil error',
+                                         body='Aperture should be in [0, 90] range')
 
+anvil_normal_not_defined = MODAL_TUPLE(header='Diamond anvil error',
+                                         body='Anvil normal is not defined or incorrect')
 
 

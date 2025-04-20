@@ -7,9 +7,12 @@ import warnings
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from Modals_content import *
+from Exceptions import DiamondAnvilError
 from pointsymmetry import generate_hkl_by_pg, PG_KEYS, get_key, generate_orig_hkl_array
 from my_logger import mylogger
 from typing import Tuple, Union, Optional, List, Dict, Any
+from nptyping import NDArray, Shape, Float, Int
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -209,7 +212,7 @@ class Ray_obstacle():
     def calf_inter_cylinder(self,
                             data: np.ndarray,
                             axis: np.ndarray,
-                            diameter: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
+                            diameter: Optional[float] = None) -> Dict[np.ndarray, np.ndarray]:
 
         if diameter is None:
             diameter = self.diameter
@@ -232,33 +235,7 @@ class Ray_obstacle():
         p2 = np.hstack(((e * t2).reshape(-1, 1), (f * t2).reshape(-1, 1), (g * t2).reshape(-1, 1)))
         return (p1, p2)
 
-    def check_all_possible_anvil(self,
-                                 ub_matr: np.ndarray,
-                                 hkl: np.ndarray,
-                                 data: Tuple[np.ndarray, ...],
-                                 half_angle: float,
-                                 wavelength: float) -> Tuple[Tuple[np.ndarray, ...], Tuple[np.ndarray, ...]]:
 
-        hkl = hkl.reshape(-1, 3, 1)
-        half_angle_rad = np.deg2rad(half_angle)
-        s = np.matmul(ub_matr, hkl).reshape(-1, 3)
-        alpha_ang = np.arctan(-s[:, 2] / s[:, 1])
-        alpha_ang[np.isnan(alpha_ang)] = 0
-        s_ = s
-        s_[:, 0] = np.abs(s[:, 0])
-        s_[:, 1] = np.abs(np.cos(alpha_ang) * s[:, 1] - np.sin(alpha_ang) * s[:, 2])
-        s_[:, 2] = 0
-        mask2lambda = (np.linalg.norm(s_, axis=1).reshape(-1, 1) <= 2 / wavelength).reshape(-1, 1)
-        mask_front = ((wavelength * s_[:, 0] + np.cos(half_angle_rad)) ** 2 + (
-                wavelength * s_[:, 1] - np.sin(half_angle_rad)) ** 2 <= 1).reshape(-1, 1) & mask2lambda
-        data_front = tuple()
-        for array in data:
-            data_front += self.array_slice(array, mask_front, 'true')
-        mask_rear = (s_[:, 0] > 2 * np.cos(half_angle_rad) / wavelength).reshape(-1, 1) & mask2lambda
-        data_rear = tuple()
-        for array in data:
-            data_rear += self.array_slice(array, mask_rear, 'true')
-        return (data_front, data_rear)
 
     @staticmethod
     def vecs_bw_vecs4(vecs: np.ndarray,
@@ -412,58 +389,6 @@ class Ray_obstacle():
             back_wall_marker = np.vstack((np.zeros((data[0].shape[0], 1)), np.ones((data[1].shape[0], 1))))
             data_output = data + (intensity, back_wall_marker)
             return data_output
-
-    def filter_anvil(self,
-                     diff_vecs: np.ndarray,
-                     diff_angles: np.ndarray,
-                     anvil_normal: np.ndarray,
-                     goniometer_axes: str,
-                     initial_axes_angles: Tuple[float, ...],
-                     scan_axis_index: int,
-                     data: Tuple[np.ndarray, ...],
-                     half_angle: float,
-                     mode: str):
-
-        cos_max_ang = np.cos(np.deg2rad(half_angle))
-        mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
-        n_reflections = diff_vecs.shape[0]
-
-        pass
-
-    def filter_stat_rev_samp(self,
-                             diff_vecs: np.ndarray,
-                             data: Tuple[np.ndarray, ...],
-                             rotations: R,
-                             mode: str,
-                             half_angle: Optional[float] = None) -> Union[bool, Tuple[np.ndarray, ...]]:
-
-        if self.geometry == 'rectangle':
-            print('static obstacle relative to sample is only available for circle geometry!')
-            return False
-
-        if half_angle is None:
-            cos_max_ang = self.dist / np.sqrt((self.diameter / 2) ** 2 + (self.dist) ** 2)
-        else:
-            cos_max_ang = np.cos(np.deg2rad(half_angle))
-
-        mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
-        reflections = diff_vecs.shape[0]
-        rotation = R.from_euler('xyz', self.rot, degrees=True)
-        normal = rotation.apply(np.array([1, 0, 0]))
-        normals = np.tile(normal, (reflections, 1))
-        normals = rotations.apply(normals)
-        diff_vecs = diff_vecs / np.linalg.norm(diff_vecs, axis=1).reshape(-1, 1)
-        cos_bw_diff_norm = (
-                normals[:, 0] * diff_vecs[:, 0] + normals[:, 1] * diff_vecs[:, 1] + normals[:, 2] * diff_vecs[:, 2])
-        cos_bw_incidence_norm = normals[:, 0]
-        mask1 = (np.abs(cos_bw_diff_norm) >= cos_max_ang)
-        mask2 = (np.abs(cos_bw_incidence_norm) >= cos_max_ang)
-        mask = (mask1 & mask2).reshape(-1, 1)
-
-        data_output = tuple()
-        for array in data:
-            data_output += self.array_slice(array, mask, mode)
-        return data_output
 
     def array_slice(self,
                     array: np.ndarray,
@@ -667,6 +592,88 @@ class Ray_obstacle():
             return data
 
 
+class DiamondAnvil(Ray_obstacle):
+    def __init__(self,
+                 normal:  Union[NDArray[Shape["1, 3"], Float],NDArray[Shape["1, 3"], Int]],
+                 aperture: float):
+        if aperture >=90 or aperture <=0:
+            raise DiamondAnvilError(modal=aperture_value_error)
+
+        self.normal = normal
+        self.aperture = aperture
+
+    def filter_anvil(self,
+                     diff_vecs: np.ndarray,
+                     diff_angles: np.ndarray,
+                     rotation_axes: str,
+                     directions_axes: Tuple[int, ...],
+                     initial_axes_angles: Tuple[float, ...],
+                     scan_axis_index: int,
+                     data: Tuple[np.ndarray, ...],
+                     mode: str,
+                     incident_beam: np.ndarray[float]):
+        cos_max_ang = np.cos(np.deg2rad(self.aperture))
+        mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
+        n_reflections = diff_vecs.shape[0]
+        angles_deg = np.rad2deg(diff_angles)
+        anvil_normals = np.tile(self.normal, (n_reflections, 1))
+        incident_beam = incident_beam / np.linalg.norm(incident_beam).reshape(-1)
+        matr1, matr3 = Sample.generate_rotation_matrices(rotations=rotation_axes, directions=directions_axes,
+                                                         angle=initial_axes_angles, no_of_scan=scan_axis_index)
+        rotations = R.from_matrix(matr1) * R.from_euler(rotation_axes[scan_axis_index],
+                                                        diff_angles * directions_axes[scan_axis_index]) * R.from_matrix(
+            matr3)
+        anvil_normals = rotations.apply(anvil_normals)
+        cos_bw_incident_norm = (anvil_normals[:, 0] * incident_beam[0] + anvil_normals[:, 1] * incident_beam[1]
+                                + anvil_normals[:, 2] * incident_beam[2])
+        cos_bw_diff_norm = (anvil_normals[:, 0] * diff_vecs[:, 0] + anvil_normals[:, 1] * diff_vecs[:, 1] +
+                            anvil_normals[:, 2] * diff_vecs[:, 2])
+        mask1 = (np.abs(cos_bw_diff_norm) >= cos_max_ang)
+        mask2 = (np.abs(cos_bw_incident_norm) >= cos_max_ang)
+        mask = (mask1 & mask2).reshape(-1, 1)
+
+        data_output = tuple()
+        for array in data:
+            data_output += self.array_slice(array, mask, mode)
+        return data_output
+
+    def check_all_possible_anvil(self,
+                                 ub_matr: np.ndarray,
+                                 hkl: np.ndarray,
+                                 data: Tuple[np.ndarray, ...],
+                                 wavelength: float,
+                                 separate_back=False) -> Dict[str, List[np.ndarray]]:
+
+        hkl = hkl.reshape(-1, 3, 1)
+        aperture_rad = np.deg2rad(self.aperture)
+        s = np.matmul(ub_matr, hkl).reshape(-1, 3)
+        alpha_ang = np.arctan(-s[:, 2] / s[:, 1])
+        alpha_ang[np.isnan(alpha_ang)] = 0
+        s_ = s
+        s_[:, 0] = np.abs(s[:, 0])
+        s_[:, 1] = np.abs(np.cos(alpha_ang) * s[:, 1] - np.sin(alpha_ang) * s[:, 2])
+        s_[:, 2] = 0
+        mask2lambda = (np.linalg.norm(s_, axis=1).reshape(-1, 1) <= 2 / wavelength).reshape(-1, 1)
+        mask_front = ((wavelength * s_[:, 0] + np.cos(aperture_rad)) ** 2 + (
+                wavelength * s_[:, 1] - np.sin(aperture_rad)) ** 2 <= 1).reshape(-1, 1) & mask2lambda
+        mask_rear = (s_[:, 0] > 2 * np.cos(aperture_rad) / wavelength).reshape(-1, 1) & mask2lambda
+
+        if separate_back:
+            data_front = []
+            for array in data:
+                data_front += self.array_slice(array, mask_front, 'true')
+            data_rear = []
+            for array in data:
+                data_rear += self.array_slice(array, mask_rear, 'true')
+            return {'double_window':data_front,'single_window': data_rear}
+        else:
+            data_all = []
+            mask_all = mask_front | mask_rear
+            for array in data:
+                data_all += self.array_slice(array,mask_all,'true')
+            return {'all_windows':data_all}
+
+
 class Sample():
     def __init__(self,
                  orient_matx: Optional[np.ndarray] = None,
@@ -743,10 +750,10 @@ class Sample():
 
     @staticmethod
     def generate_rotation_matrices(
-                                   rotations: str = 'zxz',
-                                   directions: Tuple[int, int, int] = (1, -1, 1),
-                                   angle: Tuple[float, float, float] = (1., 2., 3.),
-                                   no_of_scan: int = 1) -> Tuple[np.ndarray, np.ndarray]:
+            rotations: str,
+            directions: Tuple[int, ...],
+            angle: Tuple[float, ...],
+            no_of_scan: int = 1) -> Tuple[np.ndarray, np.ndarray]:
 
         angle = np.array(angle) * np.array(directions)
         angle = np.deg2rad(angle)
@@ -776,7 +783,7 @@ class Sample():
                     matr3 = matr3 * R.from_euler(rotations3[i], angle3[i])
                 return (matr1, matr3.as_matrix())
 
-            elif no_of_scan != 0 and no_of_scan +1 != num_of_rots:
+            elif no_of_scan != 0 and no_of_scan + 1 != num_of_rots:
                 matr1 = R.from_matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
                 rotations1 = rotations[no_of_scan:][::-1]
                 angle1 = angle[no_of_scan:][::-1]

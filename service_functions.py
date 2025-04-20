@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objs as go
 import re
 
-
 import rgb_colors
 from colorama import Back
 from main import Sample
@@ -105,6 +104,7 @@ def make_single_column_str_arr(array: np.ndarray) -> np.ndarray:
                        array[:, 2].astype(int).astype(str))
     return scsa
 
+
 def bool_intersecting_elements(arrays):
     hkl_arrays_encoded = [encode_hkl(hkl) for hkl in arrays]
     st_hkl_encoded = hkl_arrays_encoded[0]
@@ -113,8 +113,8 @@ def bool_intersecting_elements(arrays):
         common.intersection_update(hkl)
         if not common:
             break
-    bool_array = np.isin(st_hkl_encoded,np.array(tuple(common)))
-    return bool_array.reshape(-1,1)
+    bool_array = np.isin(st_hkl_encoded, np.array(tuple(common)))
+    return bool_array.reshape(-1, 1)
 
 
 def bool_not_intersecting_hkl(hkl_array1, hkl_array2):
@@ -127,7 +127,7 @@ def bool_not_intersecting_hkl(hkl_array1, hkl_array2):
     intersection1, intersection2 = indices_of_common_elements(hkl_encoded_array1, hkl_encoded_array2)
     boolarr1[intersection1] = False
     boolarr2[intersection2] = False
-    return boolarr1.reshape(-1,1), boolarr2.reshape(-1,1)
+    return boolarr1.reshape(-1, 1), boolarr2.reshape(-1, 1)
 
 
 def indices_of_common_elements(array1: np.ndarray, array2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -310,7 +310,9 @@ def visualize_scans_space(scans: List[Tuple[np.ndarray, ...]], pg: str, all_hkl:
                           all_hkl_orig: Optional[np.ndarray] = None, colors: Optional[List[str]] = None,
                           trash_unknown: bool = True,
                           origin_hkl: bool = False, visualise: bool = True, cryst_coord: bool = False,
-                          b_matr: Optional[np.ndarray] = None) -> Optional[go.Figure]:
+                          b_matr: Optional[np.ndarray] = None,
+                          restore_hkl_by_pg=False
+                          ) -> Optional[go.Figure]:
     if b_matr is None and not cryst_coord:
         warnings.warn('visualizations in direct space but no B matrix provided, switching to crystal coordinates')
         cryst_coord = True
@@ -323,6 +325,9 @@ def visualize_scans_space(scans: List[Tuple[np.ndarray, ...]], pg: str, all_hkl:
         colors = rgb_colors.colors[0:len(scans)]
         pass
     n = -1
+    if restore_hkl_by_pg:
+        all_hkl, all_hkl_orig, _ = generate_hkl_by_pg(hkl_orig_array=all_hkl_orig, pg_key=PG_KEYS[pg])
+
     if not origin_hkl:
         for scan in scans:
             n += 1
@@ -476,14 +481,14 @@ def visualize_scans_space(scans: List[Tuple[np.ndarray, ...]], pg: str, all_hkl:
         button['args'][0]['marker.size'] += layout_addition
 
     fig.layout.scene.camera.projection.type = "orthographic"
-
+    max_index =np.max([max_indexx,max_indexy,max_indexz])
     fig.update_layout(scene={
-        'xaxis': {'range': [-max_indexx, max_indexx]},
-        'yaxis': {'range': [-max_indexy, max_indexy]},
-        'zaxis': {'range': [-max_indexz, max_indexz]},
+        'xaxis': {'range': [-max_index, max_index]},
+        'yaxis': {'range': [-max_index, max_index]},
+        'zaxis': {'range': [-max_index, max_index]},
     })
 
-    fig.update_layout(width=1000, height=1000, )
+    fig.update_layout(width=1000, height=1000,scene ={'aspectmode': 'cube'} )
 
     if visualise is True:
         fig.show()
@@ -1334,9 +1339,9 @@ def check_detector_dict(dict_: Dict[str, Any]) -> bool:
                 if not dict_has_keys(dict_, ['det_complex_format', 'det_row_col_spacing'], exact_keys=False):
                     return False
                 bool_ = all((len(dict_['det_complex_format']) == 2, len(dict_['det_row_col_spacing']) == 2,
-                            dict_['det_complex_format'][0] > 0, dict_['det_complex_format'][1] > 0,
-                            type(dict_['det_complex_format'][0]) is int, type(dict_['det_complex_format'][1]) is int,
-                            dict_['det_row_col_spacing'][0] > 0, dict_['det_row_col_spacing'][1] > 0))
+                             dict_['det_complex_format'][0] > 0, dict_['det_complex_format'][1] > 0,
+                             type(dict_['det_complex_format'][0]) is int, type(dict_['det_complex_format'][1]) is int,
+                             dict_['det_row_col_spacing'][0] > 0, dict_['det_row_col_spacing'][1] > 0))
 
             except:
                 return False
@@ -1518,7 +1523,7 @@ def extract_run_data_into_list(dict_: Dict[str, Any]) -> Dict[str, Any]:
     order = []
     for axis in dict_['axes']:
         angles.append(axis['angle'])
-        order.append(axis['number'] )
+        order.append(axis['number'])
     axes_angles = [angles[i] for i in order]
     run = {
         'det_dist': dict_['detector']['det_dist'],
@@ -1578,14 +1583,14 @@ def check_run_dict(exp_inst, dict_):
     axes_nums = []
 
     for num, axis in enumerate(dict_['axes']):
-        if axis['angle'] != axes_angles[axis['number'] ] and axes_real[axis['number'] ] == 'false':
+        if axis['angle'] != axes_angles[axis['number']] and axes_real[axis['number']] == 'false':
             raise RunsDictError(load_runs_axes_angle_error)
         print(axis['number'])
         axes_nums.append(axis['number'])
     axes_nums.sort()
     if len(axes_nums) != len(set(axes_nums)):
         raise RunsDictError(check_dict_axes_repeating)
-    if exp_inst.axes_real[dict_['scan_n'] ] == 'false':
+    if exp_inst.axes_real[dict_['scan_n']] == 'false':
         raise RunsDictError(check_dict_error_fake_scan)
     if len(dict_['axes']) != len(exp_inst.axes_rotations):
         raise RunsDictError(check_dict_axes_n_mismatch)
@@ -1688,6 +1693,10 @@ def get_loaded_flags(data_loaded: Dict[str, Union[bool, None]]) -> Dict[str, Uni
     flags = {key: data_loaded[key] if data_loaded[key] in (None, False) else True for key in data_loaded.keys()}
     flags = {key: None for key in ['wavelength', 'detector', 'obstacles', 'goniometer'] if not (key in flags.keys())}
     return flags
+
+def procces_anvil_normal_data(data):
+    normal = np.array([data[0]['anvil_normal_x'],data[0]['anvil_normal_y'],data[0]['anvil_normal_z']])
+    return normal
 
 
 if __name__ == '__main__':

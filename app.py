@@ -427,7 +427,7 @@ second_page = html.Div([
         }), ]
 
     ),
-    html.Div([html.P('Wavelength Å'),
+    html.Div([html.H4('Wavelength, Å'),
               dcc.Input(
                   id='wavelength_input',
                   value=0.710730,
@@ -542,15 +542,18 @@ second_page = html.Div([
 
         style={'width': '1000px'}),
     html.Div((
-        dcc.Upload(html.Button('Upload logic collision', style={'display': 'inline-block'}), id='upload_collision_log',
-                   accept='.json',
-                   multiple=False, max_size=10000),
-        dcc.Checklist(['check collision'], id='collision_check'),
+        dcc.Upload(
+            html.Button('Upload logic collision',
+                        style={'display': 'inline-block'}),
+            id='upload_collision_log',
+            accept='.json',
+            multiple=False, max_size=10000),
+        dcc.Checklist(['factor collision'], id='collision_check'),
 
     )),
     html.Div([
         html.Div([
-            html.H6('Detector model'),
+            html.H4('Detector model'),
             dcc.Dropdown(['Rectangle', 'Circle'], '', id='Det_geom_dropdown'),
         ],
             style={
@@ -640,7 +643,49 @@ second_page = html.Div([
             'vertical-align': 'top', }
     ),
     html.Div([
-        html.H6('Beam obstacles'),
+        html.H4('Diamond anvil'),
+        html.Div([html.H6(
+            'Anvil_aperture'
+        ),
+            dcc.Input(
+                id='anvil_aperture_input',
+                value=35,
+                type='number',
+                min=0.1,
+                max=89.9,
+                step='any',
+
+            ),
+        ],
+            style={
+                'display': 'inline-block',
+                'vertical-align': 'top', }
+        ),
+        html.Div([
+            html.H6('Normal vector'),
+            dash_table.DataTable(fill_width=False,
+                                 id='anvil_normal_vector_table',
+                                 data=pd.DataFrame(np.array([[1, 0, 0]]), columns=(
+                                     'anvil_normal_x', 'anvil_normal_y', 'anvil_normal_z')).to_dict('records'),
+                                 editable=True,
+                                 columns=[
+                                     {'name': 'x', 'id': 'anvil_normal_x', 'type': 'numeric'},
+                                     {'name': 'y', 'id': 'anvil_normal_y', 'type': 'numeric'},
+                                     {'name': 'z', 'id': 'anvil_normal_z', 'type': 'numeric'},
+                                 ],
+                                 style_cell={
+                                     'width': '30px'
+                                 }, )]
+        ),
+        html.Button('Set anvil', id='set_anvil_btn',n_clicks=0),
+        dcc.Checklist(['factor anvil'], id='calc_anvil_check'),
+    ],
+        style={
+            'display': 'inline-block',
+            'vertical-align': 'top', }
+    ),
+    html.Div([
+        html.H4('Beam obstacles'),
         html.Button(
             'Add obstacle',
             id='add_obstacle_button',
@@ -970,14 +1015,6 @@ fourth_page = html.Div([
                   html.Button('map for selected', id='map_selected_button', n_clicks=0), ]
                  , style={'display': 'inline-block', }),
 
-        # dcc.Dropdown(['Rectangle', 'Circle'], '', id='Det_geom_dropdown'),
-
-        # html.Div([html.H6('Diffraction map 2d'),
-        # html.Button('2d map for selected', id='map_selected_button', n_clicks=0),],
-        #          style={'display': 'inline-block',}),
-        # html.Div([html.H6('Diffraction map 1d'),
-        # html.Button('1d map for selected', id='map_selected_button', n_clicks=0),],
-        #          style={'display': 'inline-block',}),
 
         html.Div([dcc.Graph(id='diffraction_map_graph', style={
             'width': '1000px',
@@ -1026,6 +1063,9 @@ app.layout = html.Div([dcc.Location(id="url"),
                        dcc.Store(data=None, id='stored_rectangle_parameters', storage_type='memory'),
                        dcc.Store(data=None, id='stored_obstacles_div', storage_type='memory'),
                        dcc.Store(data=0, id='stored_obstacle_num', storage_type='session'),
+                       dcc.Store(data=None,id='stored_anvil_normal_data',storage_type='memory'),
+                       dcc.Store(data=None,id='stored_anvil_aperture_data',storage_type='memory'),
+                       dcc.Store(data=None,id='stored_anvil_calc_check',storage_type='memory'),
                        # page-2 runs page
                        dcc.Store(data=False, id='page-2_stored_flag', storage_type='memory'),
                        dcc.Store(data=None, id='stored_runs_div', storage_type='memory'),
@@ -1120,6 +1160,9 @@ def get_stored_home_page_data(flag, UB_table, parameters_table):
     Output('rectangle_parameter_table', 'data', allow_duplicate=True),
     Output('obstacle_div', 'children', allow_duplicate=True),
     Output('collision_check', 'value'),
+    Output('anvil_normal_vector_table', 'data'),
+    Output('anvil_aperture_input', 'value'),
+    Output('calc_anvil_check', 'value'),
     Output("page-1_stored_flag", "data", allow_duplicate=True),
     Input("page-1_stored_flag", "data"),
     State('stored_wavelength_val', 'data'),
@@ -1131,11 +1174,14 @@ def get_stored_home_page_data(flag, UB_table, parameters_table):
     State('stored_rectangle_parameters', 'data'),
     State('stored_obstacles_div', 'data'),
     State('stored_log_collision_check', 'data'),
+    State('stored_anvil_normal_data', 'data'),
+    State('stored_anvil_aperture_data', 'data'),
+    State('stored_anvil_calc_check', 'data'),
     prevent_initial_call=True)
 @mylogger(level='DEBUG')
 def get_stored_page_1_data(flag, wavelength_val, goniometer_table, goniometer_dropdown, detector_dropdown,
                            detector_check_complex, circle_parameters, rectangle_parameters, obstacle_div,
-                           log_col_check):
+                           log_col_check,anvil_normal,anvil_aperture,anvil_check):
     if not flag:
         raise dash.exceptions.PreventUpdate()
     storage_data_list = [wavelength_val,
@@ -1145,7 +1191,12 @@ def get_stored_page_1_data(flag, wavelength_val, goniometer_table, goniometer_dr
                          detector_check_complex,
                          circle_parameters,
                          rectangle_parameters,
-                         obstacle_div, log_col_check]
+                         obstacle_div,
+                         log_col_check,
+                         anvil_normal,
+                         anvil_aperture,
+                         anvil_check
+                         ]
     output_list = [if_val_None_return_no_upd_else_return(val) for val in storage_data_list]
     output_list += [False, ]
     return output_list
@@ -1747,6 +1798,40 @@ def apply_goniometer(dicts_list, return_dict=True):
 
 
 @callback(
+    Output('stored_anvil_normal_data','data'),
+    Output('stored_anvil_aperture_data','data'),
+    Output('hidden_div_2', 'children', allow_duplicate=True),
+    Input('set_anvil_btn','n_clicks'),
+    State('anvil_normal_vector_table','data'),
+    State('anvil_aperture_input','value'),
+    prevent_initial_call=True
+)
+@mylogger(level='DEBUG',log_args=True)
+def set_anvil(n_clicks,normal_data,aperture_data):
+    if n_clicks == 0:
+        raise dash.exceptions.PreventUpdate()
+    normal = sf.procces_anvil_normal_data(normal_data)
+    try:
+        exp1.set_diamond_anvil(aperture=aperture_data,anvil_normal=normal)
+    except DiamondAnvilError as e:
+        return no_upd, no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
+    return normal_data, aperture_data, no_upd
+
+@callback(
+    Output('stored_anvil_calc_check', 'data'),
+    Input('calc_anvil_check', 'value'),
+    prevent_initial_call=True
+)
+@mylogger(level='DEBUG',log_args=True)
+def check_anvil(check):
+    if check is None or check == list():
+        exp1.calc_anvil_flag = False
+    else:
+        exp1.calc_anvil_flag = True
+    return check
+
+
+@callback(
     Output('set_obstacles_button', 'style'),
     Output('stored_obstacles_div', 'data', allow_duplicate=True),
     Input('set_obstacles_button', 'n_clicks'),
@@ -2182,15 +2267,16 @@ def calc_experiment(n_clicks, children
             'background-color': 'green'}, centring, children, pg, completeness
     return completeness, list((False, '', '')), {'background-color': 'green'}, centring, children, pg, completeness
 
+
 @callback(Output('hidden_div_4', 'children', allow_duplicate=True),
-    Input('separate_unique_common_btn', 'n_clicks'),
-    prevent_initial_call=True
-)
+          Input('separate_unique_common_btn', 'n_clicks'),
+          prevent_initial_call=True
+          )
 def separate_u_c(n_clicks):
     if n_clicks == 0:
         raise dash.exceptions.PreventUpdate()
     if exp1.scan_data is None or len(exp1.scan_data) < 2:
-        return (True, separate_unique_common_error.header,separate_unique_common_error.body)
+        return (True, separate_unique_common_error.header, separate_unique_common_error.body)
     exp1.separate_unique_common()
     return no_upd
 
@@ -2680,7 +2766,7 @@ def map_switch(value):
                 fill_width=False,
                 dropdown={
                     'x_axis': {
-                        'options': [{'label': f'{name}', 'value': no } for
+                        'options': [{'label': f'{name}', 'value': no} for
                                     no, name in enumerate(exp1.axes_names) if real_axes[no] == 'true']},
                     'y_axis': {
                         'options': [{'label': f'{name}', 'value': no + 1} for
@@ -2741,7 +2827,7 @@ def map_switch(value):
                 fill_width=False,
                 dropdown={
                     'y_axis': {
-                        'options': [{'label': f'{name}', 'value': no } for
+                        'options': [{'label': f'{name}', 'value': no} for
                                     no, name in enumerate(exp1.axes_names) if real_axes[no] == 'true']},
 
                 },
@@ -2817,7 +2903,7 @@ def calculate_diff_map(n_clicks, map_type, data_container):
         angles = list(angles_data.values())
         range_x, step_x = [(range_step_data['x_min'], range_step_data['x_max']), range_step_data['x_step']]
         range_z, step_z = [(range_step_data['z_min'], range_step_data['z_max']), range_step_data['z_step']]
-        names = (exp1.axes_names[yxz_axes[0] ], exp1.axes_names[yxz_axes[1] ], exp1.axes_names[yxz_axes[2] ])
+        names = (exp1.axes_names[yxz_axes[0]], exp1.axes_names[yxz_axes[1]], exp1.axes_names[yxz_axes[2]])
 
         fig = exp1.cell.mapv2(reflections, rotations=exp1.axes_rotations, angles=angles,
                               directions=exp1.axes_directions, rotation_directions=yxz_axes, steps=(step_x, step_z),
@@ -2836,7 +2922,7 @@ def calculate_diff_map(n_clicks, map_type, data_container):
         yx_axes = (axes_data['y_axis'], axes_data['x_axis'])
         angles = list(angles_data.values())
         range_x, step_x = [(range_step_data['x_min'], range_step_data['x_max']), range_step_data['x_step']]
-        names = (exp1.axes_names[yx_axes[0] ], exp1.axes_names[yx_axes[1] ])
+        names = (exp1.axes_names[yx_axes[0]], exp1.axes_names[yx_axes[1]])
         fig = exp1.cell.map_2d(reflections, rotations=exp1.axes_rotations, angles=angles,
                                directions=exp1.axes_directions, rotation_directions=yx_axes, step=step_x,
                                range_x=range_x, wavelength=exp1.wavelength,
@@ -2849,7 +2935,7 @@ def calculate_diff_map(n_clicks, map_type, data_container):
 
         y_axis = axes_data['y_axis']
         angles = list(angles_data.values())
-        name = exp1.axes_names[y_axis ]
+        name = exp1.axes_names[y_axis]
         fig = exp1.cell.map_1d(reflections, original_hkl=hkl_orig, rotations=exp1.axes_rotations, angles=angles,
                                directions=exp1.axes_directions, rotation_direction=y_axis, wavelength=exp1.wavelength,
                                name=name, visualise=False)
@@ -2935,7 +3021,7 @@ def calc_1d_section(relayoutdata, map_type, data_container, fig):
     angles_data = data_container['props']['children'][1]['props']['children']['props']['data'][0]
     angles = list(angles_data.values())
     axis = axes_data['y_axis']
-    angles[axis ] = start_angle
+    angles[axis] = start_angle
     n_of_ref = int(np.array(fig['data'][0]['customdata'])[:, :3].shape[0] / 2)
     reflections = np.array(fig['data'][0]['customdata'])[:n_of_ref, :3]
     reflections_orig = np.array(fig['data'][0]['customdata'])[:n_of_ref, 3:]
@@ -2954,4 +3040,4 @@ def calc_1d_section(relayoutdata, map_type, data_container, fig):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,)
