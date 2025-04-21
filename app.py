@@ -2162,7 +2162,6 @@ def download_runs(n_clicks):
     if not exp1.runs_are_set():
         return no_upd, (True, download_runs_error_runs.header, download_runs_error_runs.body)
     data_json = exp1.json_export('runs')
-    print(data_json)
     return dict(content=data_json, filename='runs.json'), no_upd
 
 

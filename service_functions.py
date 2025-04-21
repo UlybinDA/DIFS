@@ -1506,7 +1506,6 @@ def generate_scans_dicts_list(exp_inst: Any) -> List[Dict[str, Any]]:
         }
         axes_list = []
         for num, (angle, axis_name) in enumerate(zip(run[3], exp_inst.axes_names)):
-            num += 1
             axes_dict = {'number': num,
                          'angle': angle,
                          'name': axis_name}
@@ -1594,7 +1593,7 @@ def check_run_dict(exp_inst, dict_):
         raise RunsDictError(check_dict_error_fake_scan)
     if len(dict_['axes']) != len(exp_inst.axes_rotations):
         raise RunsDictError(check_dict_axes_n_mismatch)
-    if axes_nums != list(range(1, 1 + len(axes_nums))):
+    if axes_nums != list(range(0, len(axes_nums))):
         raise RunsDictError(check_dict_axes_out_of_range)
     return True
 

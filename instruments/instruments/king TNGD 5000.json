@@ -42,31 +42,45 @@
     "detector": {
         "det_geometry": "rectangle",
         "det_complex": true,
-        "det_height": 69.832,
-        "det_width": 83.592,
+        "det_height": 179.396,
+        "det_width": 168.732,
         "det_complex_format": [
-            2,
-            1
+            5,
+            2
         ],
         "det_row_col_spacing": [
             2.924,
-            0.001
+            1.204
         ]
     },
     "obstacles": [
         {
-            "distance": null,
-            "geometry": null,
-            "orientation": null,
-            "displacement_y": null,
-            "displacement_z": null,
+            "distance": 10,
+            "geometry": "circle",
+            "orientation": "normal",
+            "displacement_y": 0,
+            "displacement_z": 0,
             "height": null,
             "width": null,
+            "diameter": 2,
+            "rotation_x": 0,
+            "rotation_y": 0,
+            "rotation_z": 0,
+            "name": "bs"
+        },
+        {
+            "distance": 10,
+            "geometry": "rectangle",
+            "orientation": "independent",
+            "displacement_y": 0,
+            "displacement_z": 250,
+            "height": 500,
+            "width": 1,
             "diameter": null,
-            "rotation_x": null,
-            "rotation_y": null,
-            "rotation_z": null,
-            "name": null
+            "rotation_x": 0,
+            "rotation_y": 0,
+            "rotation_z": 0,
+            "name": "bs_holder"
         }
     ]
 }
