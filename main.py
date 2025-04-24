@@ -235,8 +235,6 @@ class Ray_obstacle():
         p2 = np.hstack(((e * t2).reshape(-1, 1), (f * t2).reshape(-1, 1), (g * t2).reshape(-1, 1)))
         return (p1, p2)
 
-
-
     @staticmethod
     def vecs_bw_vecs4(vecs: np.ndarray,
                       vecs4: np.ndarray) -> np.ndarray:
@@ -592,11 +590,74 @@ class Ray_obstacle():
             return data
 
 
+# class LinkedObstacle(Ray_obstacle):
+#     def __init__(self,
+#                  dist: float,
+#                  geometry: str,
+#                  disp_y: float,
+#                  disp_z: float,
+#                  rot: np.ndarray,
+#                  orientation: str,
+#                  height: Optional[float] = None,
+#                  width: Optional[float] = None,
+#                  diameter: Optional[float] = None,
+#                  symmetric: bool = False,
+#                  highest_linked_axis_index: int = 0,
+#                  ):
+#         self.dist = dist
+#         self.geometry = geometry
+#         self.disp_y = disp_y
+#         self.disp_z = disp_z
+#         self.rot = rot
+#         self.orientation = orientation
+#         self.height = height
+#         self.width = width
+#         self.diameter = diameter
+#         self.symmetric = symmetric
+#         self.highest_linked_axis_index = highest_linked_axis_index
+#
+#     def filter(self,
+#                diff_vecs: np.ndarray,
+#                angles: np.ndarray,
+#                data: Tuple[np.ndarray, ...],
+#                mode: str,
+#                intersection_coords: bool = False,
+#                normal: Optional[np.ndarray] = None,
+#                vec_origin_to_centre: Optional[np.ndarray] = None) -> Tuple[np.ndarray, ...]:
+#         pass
+#
+#     def create_obst_vec_arr(self,
+#                             obst_vecs: NDArray[Shape["1, 3"], Float],
+#                             diff_angles: NDArray[Shape["-1, 1"], Float],
+#                             rotation_axes: str,
+#                             directions_axes: Tuple[int, ...],
+#                             initial_axes_angles: Tuple[float, ...],
+#                             scan_axis_index: int
+#                              ):
+#         assert set(rotation_axes).issubset(['x', 'y', 'z']) and rotation_axes != '', 'Wrong rotation axes!'
+#         n_obst_vecs = obst_vecs.shape[0]
+#         n_angles = len(diff_angles)
+#         obst_vecs_ = np.tile(obst_vecs, (n_angles, 1, 1))
+#         rot_a = rotation_axes[scan_axis_index]
+#         rot_vecs = {'x': np.array([1, 0, 0]),
+#                     'y': np.array([0, 1, 0]),
+#                     'z': np.array([0, 0, 1])}
+#         rot_vec = rot_vecs.get(rot_a)
+#         rot_vecs = rot_vec * directions_axes
+#         rot_vecs = np.repeat(rot_vecs, repeats=n_obst_vecs, axis=0)
+#         rotations = R.from_rotvec(rot_vecs)
+#         obst_vecs_ = rotations.apply(obst_vecs_.reshape(-1, 3)).reshape(n_obst_vecs, -1, 3)
+#         return obst_vecs_
+#
+#     def create_obst_vecs(self,):
+#         pass
+
+
 class DiamondAnvil(Ray_obstacle):
     def __init__(self,
-                 normal:  Union[NDArray[Shape["1, 3"], Float],NDArray[Shape["1, 3"], Int]],
+                 normal: Union[NDArray[Shape["1, 3"], Float], NDArray[Shape["1, 3"], Int]],
                  aperture: float):
-        if aperture >=90 or aperture <=0:
+        if aperture >= 90 or aperture <= 0:
             raise DiamondAnvilError(modal=aperture_value_error)
 
         self.normal = normal
@@ -665,13 +726,13 @@ class DiamondAnvil(Ray_obstacle):
             data_rear = []
             for array in data:
                 data_rear += self.array_slice(array, mask_rear, 'true')
-            return {'double_window':data_front,'single_window': data_rear}
+            return {'double_window': data_front, 'single_window': data_rear}
         else:
             data_all = []
             mask_all = mask_front | mask_rear
             for array in data:
-                data_all += self.array_slice(array,mask_all,'true')
-            return {'all_windows':data_all}
+                data_all += self.array_slice(array, mask_all, 'true')
+            return {'all_windows': data_all}
 
 
 class Sample():

@@ -178,13 +178,15 @@ class Experiment():
                                                                                        return_origin=True,
                                                                                        pg=self.pg,
                                                                                        centring=self.centring)
+            print(f'n of independent {len(np.unique(self.hkl_origin_in_d_range,axis=0))}')
+
             if self.diamond_anvil and self.calc_anvil_flag:
                 self.hkl_in_d_range, self.hkl_origin_in_d_range = \
                     self.diamond_anvil.check_all_possible_anvil(ub_matr=self.cell.orient_matx, hkl=self.hkl_in_d_range,
                                                                 data=(self.hkl_in_d_range, self.hkl_origin_in_d_range),
                                                                 wavelength=self.wavelength, separate_back=False)[
                                                                                                         'all_windows']
-
+            print(f'n of independent in bublic {len(np.unique(self.hkl_origin_in_d_range,axis=0))}')
             self.centring_previous = self.centring
             self.pg_previous = self.pg
             self.d_range = d_range
@@ -685,16 +687,16 @@ import service_functions as sf
 if __name__ == '__main__':
     exp2 = Experiment()
     UB = np.array([
-        [0.1368201929280981, 0.060011227906668546, 0.010586197582489777],
-        [0.04830454979486818, -0.010060152625814183, -0.0517391533494995],
-        [0.08396030443761454, -0.09233159599224587, 0.012557357685732412],
+        [-0.11849422651445085, 0.0011282219480121245, -0.01823725003496405],
+        [-0.01685865323149584, -0.0817301363822078, 0.05102827245551952],
+        [-0.01935107006442972, 0.06386615672860567, 0.06568363644621458],
     ])
-    parameters = [15, 15, 15, 90, 90, 90]
+    parameters = [8.20438, 9.59652, 11.73293, 90.00088, 89.98536, 89.98098]
     # exp2.set_cell(matr=UB)
-    exp2.set_cell(parameters=parameters, om_chi_phi=[0, 0, 0])
-    exp2.set_pg('4/mmm')
+    exp2.set_cell(matr=UB)
+    exp2.set_pg('-1')
     exp2.set_centring('P')
-    exp2.set_wavelength(0.71)
+    exp2.set_wavelength(0.710730)
     goniometer_system = 'xzyz'
     angles = [
         [0, 0, 0, -55],
@@ -704,7 +706,7 @@ if __name__ == '__main__':
         # [0, 0, 80, -90],
     ]
     rotation_dirs = (1, 1, 1, 1)
-    aperture = 55
+    aperture = 40
     anvil_normal = np.array([1.,0.,0.])
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
@@ -715,15 +717,16 @@ if __name__ == '__main__':
     exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
     exp2.calc_anvil_flag=True
 
-    exp2.calc_experiment(d_range=(0.4, 50))
+    exp2.calc_experiment(d_range=(0.8, 55))
     data = exp2.scan_data
 
     # hkl_text = exp2.form_scan_data_as_hkl()
     #
-    # with open('hkl_out2.hkl', 'w') as f:
-    #     f.write(hkl_text)
+    # with open('Piva_2.36GPa_in_P1.hkl', 'r') as f:
+    #     a = f.read()
+    # exp2.load_hkls([a],pg=-1,centring='P')
     # exp2.separate_unique_common()
-    exp2.generate_known_space_3d(visualise=True)
+    # exp2.generate_known_space_3d(visualise=True)
     # exp1.set_logic_collision(collision)
     # exp1.check_collision_v2()
 

@@ -195,7 +195,7 @@ first_page = html.Div([
             accessKey='U'
 
         ),
-        dcc.Upload(html.Button('Upload_UB', style={'display': 'inline-block'}), id='upload_ub',
+        dcc.Upload(html.Button('Import UB', style={'display': 'inline-block'}), id='upload_ub',
                    accept='.p4p, .par, .txt',
                    multiple=False, max_size=5000000),
 
@@ -416,9 +416,9 @@ second_page = html.Div([
     modal2,
     html.H2('Instrument model'),
     html.Div([
-        html.Button('Download instrument model', id='download_instrument_btn', n_clicks=0),
+        html.Button('Export instrument model', id='download_instrument_btn', n_clicks=0),
         dcc.Download(id='download_instrument'),
-        dcc.Upload(html.Button('Upload instrument model'),
+        dcc.Upload(html.Button('Import instrument model'),
                    accept='.json', multiple=False, max_size=100000, id='upload_instrument'),
         dcc.Dropdown(id='select_instrument', style={
             'vertical-align': 'top',
@@ -442,10 +442,10 @@ second_page = html.Div([
                   id='set_wavelength_button',
                   n_clicks=0
               ),
-              dcc.Upload(html.Button('Upload wavelength'), id='upload_wavelength',
+              dcc.Upload(html.Button('Import wavelength'), id='upload_wavelength',
                          accept='.json',
                          multiple=False, max_size=100),
-              html.Button('Download wavelength', id='download_wavelength_btn', n_clicks=0),
+              html.Button('Export wavelength', id='download_wavelength_btn', n_clicks=0),
               dcc.Download(id='download_wavelength')
 
               ]
@@ -524,7 +524,7 @@ second_page = html.Div([
 
     ]),
     html.Div((
-        html.Button('Download goniometer input',
+        html.Button('Export goniometer input',
                     id='download_goniometer_btn',
                     n_clicks=0,
                     style={
@@ -535,7 +535,7 @@ second_page = html.Div([
                     }
                     ),
         dcc.Download(id='download_goniometer', ),
-        dcc.Upload(html.Button('Upload goniometer', style={'display': 'inline-block'}), id='upload_goniometer',
+        dcc.Upload(html.Button('Import goniometer', style={'display': 'inline-block'}), id='upload_goniometer',
                    accept='.json',
                    multiple=False, max_size=10000),
         dcc.Dropdown(options=goniometers, value='', id='goniometer_dropdown', clearable=False),),
@@ -543,7 +543,7 @@ second_page = html.Div([
         style={'width': '1000px'}),
     html.Div((
         dcc.Upload(
-            html.Button('Upload logic collision',
+            html.Button('Import logic collision',
                         style={'display': 'inline-block'}),
             id='upload_collision_log',
             accept='.json',
@@ -622,7 +622,7 @@ second_page = html.Div([
             )
 
         ),
-        html.Button('Download detector input',
+        html.Button('Export detector input',
                     id='download_detector_btn',
                     n_clicks=0,
                     style={
@@ -633,7 +633,7 @@ second_page = html.Div([
                     }
                     ),
         dcc.Download(id='download_detector', ),
-        dcc.Upload(html.Button('Upload detector', style={'display': 'inline-block'}), id='upload_detector',
+        dcc.Upload(html.Button('Import detector', style={'display': 'inline-block'}), id='upload_detector',
                    accept='.json',
                    multiple=False, max_size=400),
 
@@ -701,7 +701,7 @@ second_page = html.Div([
             id='set_obstacles_button',
             n_clicks=0
         ),
-        html.Button('Download obstacles input',
+        html.Button('Export obstacles input',
                     id='download_obstacles_btn',
                     n_clicks=0,
                     style={
@@ -712,7 +712,7 @@ second_page = html.Div([
                     }
                     ),
         dcc.Download(id='download_obstacles', ),
-        dcc.Upload(html.Button('Upload_obstacles', style={'display': 'inline-block'}), id='upload_obstacles',
+        dcc.Upload(html.Button('Import obstacles', style={'display': 'inline-block'}), id='upload_obstacles',
                    accept='.json', multiple=False, max_size=10000),
 
     ], ),
@@ -758,12 +758,12 @@ third_page = html.Div([
                 id='set_runs_btn',
                 n_clicks=0),
             html.Button(
-                'Download runs',
+                'Export runs',
                 id='download_runs_btn',
                 n_clicks=0),
             dcc.Download(id='download_runs'),
             dcc.Upload(html.Button(
-                'Upload runs', ), id='upload_runs', accept='.json', multiple=False, max_size=10000)
+                'Import runs', ), id='upload_runs', accept='.json', multiple=False, max_size=1000000)
 
         ],
 
@@ -908,7 +908,7 @@ fourth_page = html.Div([
     ),
     dcc.Download(id='download_data_hkl'),
     dcc.Upload([
-        html.Button('Upload hkl',
+        html.Button('Import hkl',
                     )
     ],
         style={

@@ -481,14 +481,14 @@ def visualize_scans_space(scans: List[Tuple[np.ndarray, ...]], pg: str, all_hkl:
         button['args'][0]['marker.size'] += layout_addition
 
     fig.layout.scene.camera.projection.type = "orthographic"
-    max_index =np.max([max_indexx,max_indexy,max_indexz])
+    max_index = np.max([max_indexx, max_indexy, max_indexz])
     fig.update_layout(scene={
         'xaxis': {'range': [-max_index, max_index]},
         'yaxis': {'range': [-max_index, max_index]},
         'zaxis': {'range': [-max_index, max_index]},
     })
 
-    fig.update_layout(width=1000, height=1000,scene ={'aspectmode': 'cube'} )
+    fig.update_layout(width=1000, height=1000, scene={'aspectmode': 'cube'})
 
     if visualise is True:
         fig.show()
@@ -1246,6 +1246,8 @@ def parse_par_for_UB(str_data: str, to_angstroms: bool = True) -> Optional[np.nd
         ub_components = [float(i) for i in ub_components]
         ub_matrix = np.array(ub_components).reshape(3, 3)
         if to_angstroms: ub_matrix /= wavelength
+        esp_to_brk_rotation = np.array([[-1, 0, 0], [0, -1, 0], [0, 0, 1]])
+        ub_matrix = np.matmul(esp_to_brk_rotation, ub_matrix)
         return ub_matrix
     except:
         return None
@@ -1693,9 +1695,54 @@ def get_loaded_flags(data_loaded: Dict[str, Union[bool, None]]) -> Dict[str, Uni
     flags = {key: None for key in ['wavelength', 'detector', 'obstacles', 'goniometer'] if not (key in flags.keys())}
     return flags
 
+
 def procces_anvil_normal_data(data):
-    normal = np.array([data[0]['anvil_normal_x'],data[0]['anvil_normal_y'],data[0]['anvil_normal_z']])
+    normal = np.array([data[0]['anvil_normal_x'], data[0]['anvil_normal_y'], data[0]['anvil_normal_z']])
     return normal
+
+
+class DiffractionDataHandler():
+    data_container = {}
+    high_free_index = 0
+
+    def add_data(self, data):
+        assert isinstance(data, DiffractionData), 'DiffractionData wrong format'
+        self.data_container[self.high_free_index] = {'data': data, 'ommited': False, 'order': self.high_free_index}
+        self.high_free_index += 1
+
+    def clear_data(self):
+        self.data_container = {}
+        self.high_free_index = 0
+
+    def change_ommit_by_index(self,index, flag):
+        assert index in tuple(self.data_container.keys()), f'There is no data with {index} index!'
+        self.data_container[index]['ommited'] = flag
+
+    def del_data_by_index(self, index: int):
+        r = self.data_container.pop(index, None)
+        if r:
+            if self.high_free_index - 1 == index:
+                key_mapping = {old_i: old_i - 1 for old_i in self.data_container.keys() if index < old_i}
+                for old_key, new_key in key_mapping.items():
+                    self.data_container[new_key] = self.data_container.pop(old_key)
+            self.high_free_index -= 1
+
+
+class DiffractionData():
+    def __init__(self,
+                 diff_vecs,
+                 hkl,
+                 hkl_origin,
+                 diff_angles,
+                 init_angle: float,
+                 sweep: float,
+                 ):
+        self.diff_vecs = diff_vecs
+        self.hkl = hkl
+        self.hkl_origin = hkl_origin
+        self.diff_angles = diff_angles
+        self.init_angle = init_angle
+        self.sweep = sweep
 
 
 if __name__ == '__main__':
