@@ -846,8 +846,8 @@ class Sample():
 
             elif no_of_scan != 0 and no_of_scan + 1 != num_of_rots:
                 matr1 = R.from_matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-                rotations1 = rotations[no_of_scan:][::-1]
-                angle1 = angle[no_of_scan:][::-1]
+                rotations1 = rotations[no_of_scan+1:][::-1]
+                angle1 = angle[no_of_scan+1:][::-1]
                 for i in range(len(rotations1)):
                     matr1 = matr1 * R.from_euler(rotations1[i], angle1[i])
 

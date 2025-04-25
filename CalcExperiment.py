@@ -57,6 +57,7 @@ class Experiment():
             'orientation matrix and parameters are entered, only matrix will be used ')
         if matr is not None:
             self.cell = Sample(orient_matx=matr)
+            print(matr)
             self.parameters = self.cell.parameters
         else:
             self.parameters = parameters
