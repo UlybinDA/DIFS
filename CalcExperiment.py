@@ -203,7 +203,7 @@ class Experiment():
 
         all_scan_data = tuple()
         for scan_n, scan in enumerate(self.scans):
-            *data, rest = self.cell.scan(scan_type='???', no_of_scan=scan[4],
+            data = self.cell.scan(scan_type='???', no_of_scan=scan[4],
                                          scan_sweep=scan[5],
                                          wavelength=self.wavelength,
                                          angles=scan[3], hkl_array=hkl_in,
@@ -692,33 +692,33 @@ if __name__ == '__main__':
         [-0.01685865323149584, -0.0817301363822078, 0.05102827245551952],
         [-0.01935107006442972, 0.06386615672860567, 0.06568363644621458],
     ])
-    parameters = [8.20438, 9.59652, 11.73293, 90.00088, 89.98536, 89.98098]
+    parameters = [10, 10, 10, 90.000, 90, 90]
     # exp2.set_cell(matr=UB)
-    exp2.set_cell(matr=UB)
+    exp2.set_cell(parameters=parameters,om_chi_phi=(0,0,0))
     exp2.set_pg('-1')
     exp2.set_centring('P')
     exp2.set_wavelength(0.710730)
-    goniometer_system = 'xzyz'
+    goniometer_system = 'z'
     angles = [
-        [0, 0, 0, -55],
+        [0],
         # [0, 0, 20, -90],
         # [0, 0, 40, -90],
         # [0, 0, 60, -90],
         # [0, 0, 80, -90],
     ]
-    rotation_dirs = (1, 1, 1, 1)
+    rotation_dirs = (1,)
     aperture = 40
     anvil_normal = np.array([1.,0.,0.])
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle in angles:
-        exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=angle, scan=3,
-                      sweep=20, )
+        exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=angle, scan=0,
+                      sweep=5, )
 
-    exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
-    exp2.calc_anvil_flag=True
+    # exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
+    # exp2.calc_anvil_flag=True
 
-    exp2.calc_experiment(d_range=(0.8, 55))
+    exp2.calc_experiment(d_range=(5, 11))
     data = exp2.scan_data
 
     # hkl_text = exp2.form_scan_data_as_hkl()

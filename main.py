@@ -1098,7 +1098,7 @@ class Sample():
              hkl_array_orig: Optional[np.ndarray] = None,
              wavelength: float = 0.71073,
              only_angles: bool = False) -> Union[Tuple[np.ndarray, np.ndarray],
-    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, R]]:
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
 
         if hkl_array is None:
             raise Exception('hkl_array is None, please provide some reflections as numpy array object (-1,3)')
@@ -1118,7 +1118,6 @@ class Sample():
             hkl_array = hkl_array.reshape(-1, 3)
             T = hkl_array_norm[:, -1]
             hkl_array_norm = hkl_array_norm[:, :3]
-            start_calc = time.time()
             solution = self.run(rotations, directions, angles, no_of_scan, hkl_array_norm.copy(), T)
 
             angle1 = solution[0].reshape(-1, 1)
@@ -1143,27 +1142,32 @@ class Sample():
             angle1 = angle1[~np.isnan(angle1)].reshape(-1, 1)
             angle2 = angle2[~np.isnan(angle2)].reshape(-1, 1)
 
-            rotation1 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
-                                                            angle1 * directions[no_of_scan]) * R.from_matrix(matr3)
-            rotation2 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
-                                                            angle2 * directions[no_of_scan]) * R.from_matrix(matr3)
+            if angle1.shape != (0,1):
+                rotation1 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
+                                                                angle1 * directions[no_of_scan]) * R.from_matrix(matr3)
+                hkl_rotated1 = rotation1.apply(hkl_rotated1)
+                diff_vec1 = hkl_rotated1 + np.array([1 / wavelength, 0, 0])
+            else:
+                diff_vec1 = np.array([]).reshape(-1,3)
 
-            hkl_rotated1 = rotation1.apply(hkl_rotated1)
-            hkl_rotated2 = rotation2.apply(hkl_rotated2)
+            if angle2.shape != (0,1):
+                rotation2 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
+                                                                angle2 * directions[no_of_scan]) * R.from_matrix(matr3)
+                hkl_rotated2 = rotation2.apply(hkl_rotated2)
+                diff_vec2 = hkl_rotated2 + np.array([1 / wavelength, 0, 0])
+            else:
+                diff_vec2 = np.array([]).reshape(-1,3)
 
-            diff_vec1 = hkl_rotated1 + np.array([1 / wavelength, 0, 0])
-            diff_vec2 = hkl_rotated2 + np.array([1 / wavelength, 0, 0])
+
 
             angles_all = np.vstack((angle1, angle2))
-            rotations_all = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
-                                                                angles_all * directions[
-                                                                    no_of_scan]) * R.from_matrix(matr3)
+
             hkl_all = np.vstack((hkl_array1, hkl_array2))
             hkl_array_orig_all = np.vstack((hkl_array_orig1, hkl_array_orig2))
             diff_vec_all = np.vstack((diff_vec1, diff_vec2))
             diff_vec_all = diff_vec_all / np.linalg.norm(diff_vec_all, axis=1).reshape(-1, 1)
 
-            return (diff_vec_all, hkl_all, hkl_array_orig_all, angles_all, rotations_all)
+            return (diff_vec_all, hkl_all, hkl_array_orig_all, angles_all)
 
     def calc_scan_vect(self,
                        rotations: str,
