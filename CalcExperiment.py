@@ -381,7 +381,7 @@ class Experiment():
                                  body=''.join((calc_collision_error.body, *report_body_add)))
             raise CollisionError(report)
 
-    def show_completness_(self, runs='all'):
+    def show_completeness_(self, runs='all'):
         if runs == 'all':
             data = sf.unite_runs_data(self.scan_data, runs='all')
         else:

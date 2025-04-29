@@ -2259,7 +2259,7 @@ def calc_experiment(n_clicks, children
             no_upd,
             no_upd, no_upd, no_upd)
 
-    completeness = f'{exp1.show_completness_():.2f}'
+    completeness = f'{exp1.show_completeness_():.2f}'
 
     if exp1.det_geometry is None:
         return completeness, list((True, calc_exp_no_det_warn.header, calc_exp_no_det_warn.body)), {
@@ -2315,7 +2315,7 @@ def load_hkl(contents):
         except HKLFormatError as e:
             return no_upd, no_upd, None, (True, e.error_modal_content.header, e.error_modal_content.body)
     exp1.load_hkls(hkl_list)
-    completeness = f'{exp1.show_completness_():.2f}'
+    completeness = f'{exp1.show_completeness_():.2f}'
     return completeness, completeness, None, no_upd
 
 

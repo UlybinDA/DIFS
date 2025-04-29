@@ -982,31 +982,26 @@ class Sample():
                 hkl_array[:, 2] * hkl_array[:, 1] * a ** 2 * b * c * (np.cos(gm) * np.cos(bt) - np.cos(al)) + 2 *
                 hkl_array[:, 0] * hkl_array[:, 2] * a * b ** 2 * c * (np.cos(al) * np.cos(gm) - np.cos(bt))) ** 0.5
         return d_array
-
-    def angle_range(self,
+    @staticmethod
+    def angle_range(
                     scan_sweep: float,
                     start_angle: float,
-                    epsilon: float = 1e-12
+                    epsilon: float = 1e-12,
+                    start_rad:Union[None,float] = None,
+                    end_rad:Union[None,float] = None
                     ) -> Tuple[float, float, str]:
+        if not start_rad and not end_rad:
+            start_rad = np.deg2rad(start_angle) % (2 * np.pi)
+            sweep_rad = np.deg2rad(scan_sweep)
 
-        sweep_rad = np.deg2rad(scan_sweep) % (2 * np.pi + epsilon) * np.sign(scan_sweep)
-        start_rad = np.deg2rad(start_angle) % (2 * np.pi + epsilon)
-
-        if sweep_rad > 0:
             end_rad = start_rad + sweep_rad
 
-            if end_rad <= 2 * np.pi:
-                return (start_rad, end_rad, 'in')
-            else:
-                return (end_rad - 2 * np.pi, start_rad, 'ex')
+        if 0 - epsilon <= end_rad <= 2 * np.pi + epsilon:
+            return (min(start_rad, end_rad), max(start_rad, end_rad), 'in')
 
-        else:
-            end_rad = start_rad + sweep_rad
-
-            if end_rad >= 0:
-                return (end_rad, start_rad, 'in')
-            else:
-                return (start_rad, end_rad + 2 * np.pi, 'ex')
+        end_norm = end_rad % (2 * np.pi)
+        start_norm = start_rad % (2 * np.pi)
+        return (min(start_norm, end_norm), max(start_norm, end_norm), 'ex')
 
     def angles_in_sweep(self,
                         angles_array: np.ndarray,

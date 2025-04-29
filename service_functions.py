@@ -785,7 +785,7 @@ def decode_hkl(array: np.ndarray) -> np.ndarray:
     base = 1001
     l = np.round(array / base ** 2).astype(int)
     k = np.round((array - l * base ** 2) / base).astype(int)
-    h = array - l * base ** 2 - k * base
+    h = (array - l * base ** 2 - k * base).astype(int)
     decoded_array = np.hstack((h, k, l))
     return decoded_array
 
@@ -1246,7 +1246,7 @@ def parse_par_for_UB(str_data: str, to_angstroms: bool = True) -> Optional[np.nd
         ub_components = [float(i) for i in ub_components]
         ub_matrix = np.array(ub_components).reshape(3, 3)
         if to_angstroms: ub_matrix /= wavelength
-        esp_to_brk_rotation = np.array([[-1, 0, 0], [0, -1, 0], [0, 0, 1]])
+        esp_to_brk_rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]])
         ub_matrix = np.matmul(esp_to_brk_rotation, ub_matrix)
         return ub_matrix
     except:
@@ -1701,20 +1701,48 @@ def procces_anvil_normal_data(data):
     return normal
 
 
-class DiffractionDataHandler():
+class CumulativeDataHandler():
     data_container = {}
     high_free_index = 0
+    d_low = None
+    d_high = None
+
+    def __init__(self, parameters):
+        self.cell_parameters = parameters
+
+    def set_d_roi(self, roi):
+        self.d_low = min(roi)
+        self.d_high = max(roi)
+
+    def create_spacings_for_hkl_e(self,hkl_e):
+       assert self.cell_parameters, 'Set parameters first!'
+       d_array = create_d_array(parameters=self.cell_parameters, hkl_array=decode_hkl(hkl_e))
+       return d_array
 
     def add_data(self, data):
         assert isinstance(data, DiffractionData), 'DiffractionData wrong format'
-        self.data_container[self.high_free_index] = {'data': data, 'ommited': False, 'order': self.high_free_index}
+        self.data_container[self.high_free_index] = {
+            'diff_vecs': data.diff_vecs,
+            'diff_angles': data.diff_angles,
+            'init_angles': data.init_angle,
+            'sweep':data.sweep,
+            'hkl_e':data.hkl_e,
+            'hkl_origin_e':data.hkl_origin_e,
+            'ommited': False,
+            'order': self.high_free_index,
+            'angle_roi': [0, np.pi * 2],
+            'd_spacings': self.create_spacings_for_hkl_e(data.hkl_e).reshape(-1)
+        }
+
         self.high_free_index += 1
 
     def clear_data(self):
         self.data_container = {}
         self.high_free_index = 0
+        self.hkl_all_e = None
+        self.hkl_orig_all_e = None
 
-    def change_ommit_by_index(self,index, flag):
+    def change_ommit_by_index(self, index, flag):
         assert index in tuple(self.data_container.keys()), f'There is no data with {index} index!'
         self.data_container[index]['ommited'] = flag
 
@@ -1727,6 +1755,46 @@ class DiffractionDataHandler():
                     self.data_container[new_key] = self.data_container.pop(old_key)
             self.high_free_index -= 1
 
+    def add_all_hkl(self, hkl_all, hkl_orig_all):
+        data = (hkl_all, hkl_orig_all)
+        assert all(isinstance(hkl, np.ndarray) for hkl in data) and all(
+            len(hkl[0]) == 3 for hkl in data), 'wrong hkl data format'
+        self.hkl_all_e = encode_hkl(hkl_all)
+        self.hkl_orig_all_e = encode_hkl(hkl_orig_all)
+
+    def gen_bool_mask(self,run_data):
+        d_low_bool = run_data['d_spacings'] > self.d_low if self.d_low else True
+        d_high_bool = run_data['d_spacings'] < self.d_high if self.d_high else True
+        # min_,max_,range = Sample.angle_range(scan_sweep=)
+        d_bool = d_low_bool & d_high_bool
+
+        pass
+
+
+    def calc_cumulative_comp_ordered_data(self):
+
+        pass
+
+    def sort_order_by_completeness(self):
+        assert self.hkl_orig_all, 'to sort by comp, first add hkl origin super group'
+        order_index = 0
+
+        hkl_base = np.array([])
+
+    def calc_completeness(self, hkl, base_hkl=None):
+        assert self.hkl_orig_all, 'to sort by comp, first add hkl origin super group'
+        if base_hkl:
+            hkl = np.append(hkl, base_hkl)
+        completeness = self.completeness(hkl=hkl, all_hkl=self.hkl_orig_all_e)
+        return completeness
+
+    def completeness(self, hkl, all_hkl):
+        n_uniq_hkl = np.unique(hkl)
+        n_uniq_hkl_all = np.unique(all_hkl)
+        completeness = n_uniq_hkl / n_uniq_hkl_all * 100
+        return completeness
+
+
 
 class DiffractionData():
     def __init__(self,
@@ -1738,8 +1806,8 @@ class DiffractionData():
                  sweep: float,
                  ):
         self.diff_vecs = diff_vecs
-        self.hkl = hkl
-        self.hkl_origin = hkl_origin
+        self.hkl_e = encode_hkl(hkl)
+        self.hkl_origin_e = encode_hkl(hkl_origin)
         self.diff_angles = diff_angles
         self.init_angle = init_angle
         self.sweep = sweep
