@@ -984,8 +984,8 @@ class Sample():
         return d_array
     @staticmethod
     def angle_range(
-                    scan_sweep: float,
-                    start_angle: float,
+                    scan_sweep: float = 0,
+                    start_angle: float = 0,
                     epsilon: float = 1e-12,
                     start_rad:Union[None,float] = None,
                     end_rad:Union[None,float] = None
@@ -1003,25 +1003,33 @@ class Sample():
         start_norm = start_rad % (2 * np.pi)
         return (min(start_norm, end_norm), max(start_norm, end_norm), 'ex')
 
-    def angles_in_sweep(self,
+    @staticmethod
+    def angles_in_sweep(
                         angles_array: np.ndarray,
                         start: float,
                         end: float,
-                        type: str) -> np.ndarray:
+                        sweep_type: str = 'in',
+                        return_bool: bool = False) -> np.ndarray:
+        angles = angles_array.copy()
 
-        if end - start > np.pi * 2:
-            return angles_array
+        if end - start >= 2 * np.pi:
+            if return_bool:
+                return np.ones_like(angles, dtype=bool)
+            return angles
+
+        if sweep_type == 'in':
+            mask = (angles >= start) & (angles <= end)
+        elif sweep_type == 'ex':
+            mask = (angles < start) | (angles > end)
         else:
-            if type == 'in':
-                angles_array[angles_array < start] = np.nan
-                angles_array[angles_array > end] = np.nan
-                return angles_array
-            elif type == 'ex':
-                i = angles_array.copy()
-                i[angles_array < start] = np.nan
-                i[angles_array > end] = np.nan
-                angles_array[~np.isnan(i)] = np.nan
-                return angles_array
+            raise ValueError("sweep_type must be either 'in' or 'ex'")
+
+        if return_bool:
+            return mask
+
+        result = angles.copy()
+        result[~mask] = np.nan
+        return result
 
     @mylogger(level='DEBUG', log_args=True, log_result=True)
     def gen_hkl_arrays(self,
@@ -1109,7 +1117,7 @@ class Sample():
 
         if scan_type == '???':
             angle_start = angles[no_of_scan]
-            range = self.angle_range(scan_sweep, angle_start)
+            range_ = self.angle_range(scan_sweep, angle_start)
             hkl_array = hkl_array.reshape(-1, 3)
             T = hkl_array_norm[:, -1]
             hkl_array_norm = hkl_array_norm[:, :3]
@@ -1123,8 +1131,8 @@ class Sample():
             angle1[angle1 < 0] = 2 * np.pi + angle1[angle1 < 0]
             angle2[angle2 < 0] = 2 * np.pi + angle2[angle2 < 0]
 
-            angle1 = self.angles_in_sweep(angle1, range[0], range[1], range[2])
-            angle2 = self.angles_in_sweep(angle2, range[0], range[1], range[2])
+            angle1 = self.angles_in_sweep(angle1, range_[0], range_[1], range_[2])
+            angle2 = self.angles_in_sweep(angle2, range_[0], range_[1], range_[2])
             if only_angles is True:
                 return (angle1, angle2)
 

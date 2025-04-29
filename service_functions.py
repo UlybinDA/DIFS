@@ -1730,7 +1730,7 @@ class CumulativeDataHandler():
             'hkl_origin_e':data.hkl_origin_e,
             'ommited': False,
             'order': self.high_free_index,
-            'angle_roi': [0, np.pi * 2],
+            'angle_roi': None,
             'd_spacings': self.create_spacings_for_hkl_e(data.hkl_e).reshape(-1)
         }
 
@@ -1765,15 +1765,38 @@ class CumulativeDataHandler():
     def gen_bool_mask(self,run_data):
         d_low_bool = run_data['d_spacings'] > self.d_low if self.d_low else True
         d_high_bool = run_data['d_spacings'] < self.d_high if self.d_high else True
-        # min_,max_,range = Sample.angle_range(scan_sweep=)
+        min_,max_,range_ = Sample.angle_range(start_rad=run_data['angle_roi'][0],end_rad=run_data['angle_roi'][0])
         d_bool = d_low_bool & d_high_bool
 
+        sweep_bool = Sample.angles_in_sweep(angles_array=run_data['diff_angles'],start=min_,end=max_,sweep_type=range_,
+                                            return_bool=True).reshape(-1) if run_data else True
+        bool_ = d_bool & sweep_bool
+        return bool_
+
+    def calc_cumulative_completeness(self):
+        base = np.array([])
+        dynamic_ommited = []
+        completeness = 0
+        for run_data in self.data_container:
+            if not run_data['ommited']:
+                pass
+
+    def find_highest_comp_increment(self,hkl_original_base,runs_data):
+        completeness = None
+        for run_data in runs_data:
+            hkl_original = np.append(hkl_original_base,run_data['hkl_origin_e'])
+
+
+
         pass
 
-
-    def calc_cumulative_comp_ordered_data(self):
-
-        pass
+    def shuffle_dict_by_permutation(self, original_dict, permutation):
+        keys = list(original_dict.keys())
+        values = list(original_dict.values())
+        shuffled_dict = {}
+        for i, key in enumerate(keys):
+            shuffled_dict[key] = values[permutation[i]]
+        return shuffled_dict
 
     def sort_order_by_completeness(self):
         assert self.hkl_orig_all, 'to sort by comp, first add hkl origin super group'
