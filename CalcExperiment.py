@@ -135,12 +135,12 @@ class Experiment():
 
     def add_scan(self, det_dist, det_angles, det_orientation, axes_angles, scan, sweep, det_disp_y=None,
                  det_disp_z=None):
-        scan = (det_dist, det_angles, det_orientation, axes_angles, scan, sweep, det_disp_y, det_disp_z)
+        scan_ = (det_dist, det_angles, det_orientation, axes_angles, scan, sweep, det_disp_y, det_disp_z)
 
         if hasattr(self, 'scans'):
-            self.scans.append(scan)
+            self.scans.append(scan_)
         else:
-            self.scans = [scan, ]
+            self.scans = [scan_, ]
 
     def delete_scan(self, index_of_scan=0, all_=False):
         if all_:
@@ -692,34 +692,66 @@ if __name__ == '__main__':
         [-0.01685865323149584, -0.0817301363822078, 0.05102827245551952],
         [-0.01935107006442972, 0.06386615672860567, 0.06568363644621458],
     ])
-    parameters = [10, 10, 10, 90.000, 90, 90]
+    parameters = [15, 15, 15, 90.000, 90, 90]
     # exp2.set_cell(matr=UB)
     exp2.set_cell(parameters=parameters,om_chi_phi=(0,0,0))
-    exp2.set_pg('-1')
+    exp2.set_pg('2/m')
     exp2.set_centring('P')
     exp2.set_wavelength(0.710730)
-    goniometer_system = 'z'
+    goniometer_system = 'zxz'
     angles = [
-        [0],
+        [0, 54.71, 0],
+
+        [120,80,0],
+
+        [240,200,0],
         # [0, 0, 20, -90],
         # [0, 0, 40, -90],
         # [0, 0, 60, -90],
         # [0, 0, 80, -90],
     ]
-    rotation_dirs = (1,)
+    rotation_dirs = (-1,-1,1)
     aperture = 40
     anvil_normal = np.array([1.,0.,0.])
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle in angles:
-        exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=angle, scan=0,
-                      sweep=5, )
+        exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=angle, scan=2,
+                      sweep=50, )
 
     # exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
     # exp2.calc_anvil_flag=True
 
-    exp2.calc_experiment(d_range=(5, 11))
+
+    exp2.calc_experiment(d_range=(0.68, 20))
     data = exp2.scan_data
+    scan_inputs = exp2.scans
+    data_list = []
+    for scan,run in zip(scan_inputs,data):
+        axis_index = scan[4]
+        data_list.append(sf.DiffractionData(diff_vecs=run[0],
+                                            hkl=run[1],
+                                            hkl_origin=run[2],
+                                            diff_angles=run[3],
+                                            init_angle=scan[3][axis_index],
+                                            sweep=scan[5]
+        ))
+    # handler_test = sf.CumulativeDataHandler(parameters=exp2.cell.parameters)
+    # handler_test.add_all_hkl(hkl_all=exp2.hkl_in_d_range,hkl_orig_all=exp2.hkl_origin_in_d_range)
+    # for data in data_list:
+    #     handler_test.add_data(data)
+
+
+    # new_roi = [np.deg2rad(0),np.deg2rad(50)]
+    # handler_test.data_container[2]['angle_roi'] = new_roi
+
+
+    com,per = handler_test.calc_cumulative_completeness(order_by_decrement=True)
+    print(com,per)
+    # handler_test.data_container = handler_test.shuffle_dict_by_permutation(handler_test.data_container,per)
+    handler_test.set_d_roi([1,20])
+    com,per = handler_test.calc_cumulative_completeness()
+    print(com,per)
 
     # hkl_text = exp2.form_scan_data_as_hkl()
     #

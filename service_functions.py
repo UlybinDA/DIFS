@@ -786,7 +786,7 @@ def decode_hkl(array: np.ndarray) -> np.ndarray:
     l = np.round(array / base ** 2).astype(int)
     k = np.round((array - l * base ** 2) / base).astype(int)
     h = (array - l * base ** 2 - k * base).astype(int)
-    decoded_array = np.hstack((h, k, l))
+    decoded_array = np.hstack((h.reshape(-1, 1), k.reshape(-1, 1), l.reshape(-1, 1)))
     return decoded_array
 
 
@@ -1701,23 +1701,26 @@ def procces_anvil_normal_data(data):
     return normal
 
 
-class CumulativeDataHandler():
+class CumulativeDataCalculator:
     data_container = {}
     high_free_index = 0
     d_low = None
     d_high = None
+    hkl_all_e = None
+    hkl_orig_all_e = None
+    d_spacings_all = None
 
     def __init__(self, parameters):
         self.cell_parameters = parameters
+
 
     def set_d_roi(self, roi):
         self.d_low = min(roi)
         self.d_high = max(roi)
 
-    def create_spacings_for_hkl_e(self,hkl_e):
-       assert self.cell_parameters, 'Set parameters first!'
-       d_array = create_d_array(parameters=self.cell_parameters, hkl_array=decode_hkl(hkl_e))
-       return d_array
+    def create_spacings_for_hkl_e(self, hkl_e):
+        d_array = create_d_array(parameters=self.cell_parameters, hkl_array=decode_hkl(hkl_e))
+        return d_array
 
     def add_data(self, data):
         assert isinstance(data, DiffractionData), 'DiffractionData wrong format'
@@ -1725,9 +1728,9 @@ class CumulativeDataHandler():
             'diff_vecs': data.diff_vecs,
             'diff_angles': data.diff_angles,
             'init_angles': data.init_angle,
-            'sweep':data.sweep,
-            'hkl_e':data.hkl_e,
-            'hkl_origin_e':data.hkl_origin_e,
+            'sweep': data.sweep,
+            'hkl_e': data.hkl_e,
+            'hkl_origin_e': data.hkl_origin_e,
             'ommited': False,
             'order': self.high_free_index,
             'angle_roi': None,
@@ -1761,34 +1764,84 @@ class CumulativeDataHandler():
             len(hkl[0]) == 3 for hkl in data), 'wrong hkl data format'
         self.hkl_all_e = encode_hkl(hkl_all)
         self.hkl_orig_all_e = encode_hkl(hkl_orig_all)
+        self.d_spacings_all = self.create_spacings_for_hkl_e(self.hkl_all_e)
 
-    def gen_bool_mask(self,run_data):
-        d_low_bool = run_data['d_spacings'] > self.d_low if self.d_low else True
-        d_high_bool = run_data['d_spacings'] < self.d_high if self.d_high else True
-        min_,max_,range_ = Sample.angle_range(start_rad=run_data['angle_roi'][0],end_rad=run_data['angle_roi'][0])
+    def gen_d_roi_bool_mask(self,d_spacings):
+        d_low_bool = d_spacings > self.d_low if self.d_low else True
+        d_high_bool = d_spacings < self.d_high if self.d_high else True
         d_bool = d_low_bool & d_high_bool
+        return d_bool
 
-        sweep_bool = Sample.angles_in_sweep(angles_array=run_data['diff_angles'],start=min_,end=max_,sweep_type=range_,
-                                            return_bool=True).reshape(-1) if run_data else True
+    def gen_angle_roi_bool_mask(self,angle_roi, diff_angles):
+        if angle_roi:
+            min_, max_, range_ = Sample.angle_range(start_rad=angle_roi[0],
+                                                    end_rad=angle_roi[1])
+
+            sweep_bool = Sample.angles_in_sweep(angles_array=diff_angles, start=min_, end=max_,
+                                                sweep_type=range_,return_bool=True).reshape(-1)
+
+        else:
+            sweep_bool = True
+        return sweep_bool
+
+
+    def gen_bool_mask(self, run_data):
+        d_bool = self.gen_d_roi_bool_mask(run_data['d_spacings'])
+        sweep_bool = self.gen_angle_roi_bool_mask(angle_roi=run_data['angle_roi'],diff_angles=run_data['diff_angles'])
         bool_ = d_bool & sweep_bool
         return bool_
 
-    def calc_cumulative_completeness(self):
-        base = np.array([])
-        dynamic_ommited = []
-        completeness = 0
-        for run_data in self.data_container:
-            if not run_data['ommited']:
-                pass
+    def calc_cumulative_completeness(self, order_by_decrement=True):
+        completeness_list = []
+        runs_data = self.data_container
+        ommited_list = []
+        runs_order = []
+        dynamic_ommition = []
+        for run_data in runs_data.values():
+            ommited_list.append(run_data['ommited'])
 
-    def find_highest_comp_increment(self,hkl_original_base,runs_data):
+        hkl_original_base = np.array([])
+        while not all(ommited_list):
+            if order_by_decrement:
+                completeness, index, hkl_add = self.calc_highest_comp_increment(hkl_original_base=hkl_original_base,
+                                                                                runs_data=runs_data)
+            else:
+                completeness, index, hkl_add = self.calc_dict_order_comp(hkl_original_base=hkl_original_base,
+                                                                         runs_data=runs_data)
+            completeness_list.append(completeness)
+            runs_data[index]['ommited'] = True
+            dynamic_ommition.append(index)
+            ommited_list[index] = True
+            runs_order.append(index)
+            hkl_original_base = np.append(hkl_original_base, hkl_add)
+        for index in dynamic_ommition:
+            runs_data[index]['ommited'] = False
+
+        return completeness_list, runs_order
+
+    def calc_highest_comp_increment(self, hkl_original_base, runs_data):
         completeness = None
-        for run_data in runs_data:
-            hkl_original = np.append(hkl_original_base,run_data['hkl_origin_e'])
+        index = None
+        hkl_original = None
+        for i, run_data in runs_data.items():
+            if not run_data['ommited']:
+                bool_mask = self.gen_bool_mask(run_data)
+                hkl_original_ = run_data['hkl_origin_e'][bool_mask].reshape(-1)
+                completeness_ = self.calc_completeness(base_hkl=hkl_original_base, hkl=hkl_original_)
+                if not completeness or completeness < completeness_:
+                    completeness = completeness_
+                    index = i
+                    hkl_original = hkl_original_
 
+        return completeness, index, hkl_original
 
-
-        pass
+    def calc_dict_order_comp(self, hkl_original_base, runs_data):
+        for index, run_data in runs_data.items():
+            if not run_data['ommited']:
+                bool_mask = self.gen_bool_mask(run_data=run_data)
+                hkl_original = run_data['hkl_origin_e'][bool_mask].reshape(-1)
+                completeness = self.calc_completeness(base_hkl=hkl_original_base, hkl=run_data['hkl_origin_e'])
+                return completeness, index, hkl_original
 
     def shuffle_dict_by_permutation(self, original_dict, permutation):
         keys = list(original_dict.keys())
@@ -1798,25 +1851,27 @@ class CumulativeDataHandler():
             shuffled_dict[key] = values[permutation[i]]
         return shuffled_dict
 
-    def sort_order_by_completeness(self):
-        assert self.hkl_orig_all, 'to sort by comp, first add hkl origin super group'
-        order_index = 0
-
-        hkl_base = np.array([])
-
-    def calc_completeness(self, hkl, base_hkl=None):
-        assert self.hkl_orig_all, 'to sort by comp, first add hkl origin super group'
-        if base_hkl:
+    def calc_completeness(self, hkl, bool_mask=None, base_hkl=None):
+        assert self.hkl_orig_all_e.any(), 'to sort by comp, first add hkl origin super group'
+        if bool_mask is not None:
+            hkl = hkl[bool_mask]
+        if base_hkl is not None:
             hkl = np.append(hkl, base_hkl)
-        completeness = self.completeness(hkl=hkl, all_hkl=self.hkl_orig_all_e)
+        completeness = self.completeness(hkl_original=hkl, all_original_hkl=self.hkl_orig_all_e,cut_d=True)
         return completeness
 
-    def completeness(self, hkl, all_hkl):
-        n_uniq_hkl = np.unique(hkl)
-        n_uniq_hkl_all = np.unique(all_hkl)
+    def completeness(self, hkl_original, all_original_hkl,cut_d=False):
+        if cut_d:
+            bool_a_ = self.gen_d_roi_bool_mask(self.d_spacings_all)
+            n_uniq_hkl = len(np.unique(hkl_original))
+            n_uniq_hkl_all = len(np.unique(all_original_hkl[bool_a_]))
+            completeness = n_uniq_hkl / n_uniq_hkl_all * 100
+            return completeness
+
+        n_uniq_hkl = len(np.unique(hkl_original))
+        n_uniq_hkl_all = len(np.unique(all_original_hkl))
         completeness = n_uniq_hkl / n_uniq_hkl_all * 100
         return completeness
-
 
 
 class DiffractionData():
