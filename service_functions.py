@@ -142,7 +142,7 @@ def generate_hkl_data_for_visual(data: Tuple[np.ndarray, ...], all_hkl: np.ndarr
                                  b_matr: Optional[np.ndarray] = None) -> Dict[
     str, Union[np.ndarray, Tuple[str, ...], int]]:
     if trash_unknown == False:
-        data = np.hstack(data[1:3])
+        data = np.hstack(data)
         known_rec_space, hkl_orig_array = multiply_hkl_by_pg(data, pg)
         known_rec_space_encoded_array = encode_hkl(known_rec_space)
         all_hkl_encoded_array = encode_hkl(all_hkl)
@@ -195,7 +195,7 @@ def generate_hkl_data_for_visual(data: Tuple[np.ndarray, ...], all_hkl: np.ndarr
 
 
     elif trash_unknown == True:
-        data = np.hstack(data[1:3])
+        data = np.hstack(data)
         known_rec_space, hkl_orig_array = multiply_hkl_by_pg(data, pg)
 
         known_rec_space, indices = np.unique(known_rec_space, return_index=True, axis=0)
@@ -233,7 +233,7 @@ def generate_hkl_orig_data_for_visual(data: Tuple[np.ndarray, ...], all_orig_hkl
                                       b_matr: Optional[np.ndarray] = None) -> Dict[
     str, Union[np.ndarray, Tuple[str, ...], int]]:
     if trash_unknown is False:
-        known_hkl_orig = np.unique(data[2], axis=0)
+        known_hkl_orig = np.unique(data[1], axis=0)
         known_hkl_orig_encoded_array = (encode_hkl(known_hkl_orig))
         all_orig_hkl = np.unique(all_orig_hkl, axis=0)
         all_orig_hkl_encoded_array = encode_hkl(all_orig_hkl)
@@ -274,7 +274,7 @@ def generate_hkl_orig_data_for_visual(data: Tuple[np.ndarray, ...], all_orig_hkl
                 'i_first_unknown': color_tuple.index('#ff0000')
             }
     elif trash_unknown is True:
-        hkl_array = np.unique(data[2], axis=0)
+        hkl_array = np.unique(data[1], axis=0)
 
         color_tuple = tuple((f'{color}',) * hkl_array.shape[0])
         if cryst_coord:
@@ -319,17 +319,16 @@ def visualize_scans_space(scans: List[Tuple[np.ndarray, ...]], pg: str, all_hkl:
         pass
     if not trash_unknown:
         pass
-
     scans_data = list()
     if colors is None:
-        colors = rgb_colors.colors[0:len(scans)]
+        colors = rgb_colors.colors[0:len(scans[0])]
         pass
     n = -1
     if restore_hkl_by_pg:
         all_hkl, all_hkl_orig, _ = generate_hkl_by_pg(hkl_orig_array=all_hkl_orig, pg_key=PG_KEYS[pg])
 
     if not origin_hkl:
-        for scan in scans:
+        for scan in zip(*scans):
             n += 1
             scan_data = generate_hkl_data_for_visual(scan, all_hkl, all_hkl_orig, pg, color=colors[n],
                                                      trash_unknown=True, cryst_coord=cryst_coord,
@@ -353,7 +352,7 @@ def visualize_scans_space(scans: List[Tuple[np.ndarray, ...]], pg: str, all_hkl:
 
 
     elif origin_hkl:
-        for scan in scans:
+        for scan in zip(*scans):
             n += 1
             scan_data = generate_hkl_orig_data_for_visual(scan, all_orig_hkl=all_hkl_orig, color=colors[n],
                                                           trash_unknown=True, cryst_coord=cryst_coord,
@@ -601,45 +600,23 @@ def separate_diff_vectors_by_vector_direction(diff_vecs: np.ndarray, data: Tuple
     return (data_front, data_rear)
 
 
-def show_completness(data: Tuple[np.ndarray, ...], all_hkl_orig: np.ndarray) -> float:
-    n_indepen_refs = np.unique(data[2], axis=0).shape[0]
+def show_completness(hkl_origin: np.ndarray, all_hkl_orig: np.ndarray) -> float:
+    n_indepen_refs = np.unique(hkl_origin, axis=0).shape[0]
     n_all_indepen_refs = np.unique(all_hkl_orig, axis=0).shape[0]
     completeness = n_indepen_refs / n_all_indepen_refs * 100
-    print(Back.CYAN + f'completeness {completeness:.2f}%' + Back.RESET)
     return completeness
 
-
-def show_redundancy(data: Tuple[np.ndarray, ...]) -> float:
-    hkl = data[1]
-    rest, counts = np.unique(hkl, axis=0, return_counts=True)
-    redundancy = np.sum(counts) / counts.shape[0]
-    print(Back.YELLOW + f'redundancy {redundancy:.2f}' + Back.RESET)
-    return redundancy
-
-
-def show_redundancy_V2(data: Tuple[np.ndarray, ...], all_hkl_orig: np.ndarray) -> float:
-    n_hkl = data[1].shape[0]
+def show_redundancy_V2(hkl:np.ndarray, all_hkl_orig: np.ndarray) -> float:
+    n_hkl = hkl.shape[0]
     n_all_hkl_orig = all_hkl_orig.shape[0]
     redundancy = n_hkl / n_all_hkl_orig
-    print(Back.YELLOW + f'redundancy {redundancy:.2f}' + Back.RESET)
     return redundancy
 
-
-def show_multiplicity_(data: Tuple[np.ndarray, ...]) -> float:
-    hkl_original = data[2]
-    rest, counts = np.unique(hkl_original, axis=0, return_counts=True)
-    multiplicity = np.sum(counts) / counts.shape[0]
-    print(Back.GREEN + f'multiplicity {multiplicity:.2f}' + Back.RESET)
-    return multiplicity
-
-
-def show_multiplicity_V2(data: Tuple[np.ndarray, ...], all_hkl_orig: np.ndarray) -> float:
-    n_hkl_original = data[2].shape[0]
+def show_multiplicity_V2(hkl_origin: np.ndarray, all_hkl_orig: np.ndarray) -> float:
+    n_hkl_origin = hkl_origin.shape[0]
     n_all_hkl_orig_unique = np.unique(all_hkl_orig, axis=0).shape[0]
-    multiplicity = np.sum(n_hkl_original) / n_all_hkl_orig_unique
-    print(Back.GREEN + f'multiplicity {multiplicity:.2f}' + Back.RESET)
+    multiplicity = np.sum(n_hkl_origin) / n_all_hkl_orig_unique
     return multiplicity
-
 
 def calc_cell_volume(parameters: List[float]) -> float:
     cell_vol = parameters[0] * parameters[1] * parameters[2] * (1 - np.cos(np.deg2rad(parameters[3])) ** 2 - np.cos(
@@ -720,14 +697,14 @@ def create_d_array(parameters: List[float], hkl_array: np.ndarray) -> np.ndarray
     return d_array
 
 
-def make_line_plot_graph(scan: Tuple[np.ndarray, ...], all_hkl_orig: np.ndarray, parameters: List[float], step: float,
+def make_line_plot_graph(data: Tuple[np.ndarray, ...], all_hkl_orig: np.ndarray, parameters: List[float], step: float,
                          completeness: bool = True, redundancy: bool = True, multiplicity: bool = True) -> Tuple[
     Optional[go.Figure], Optional[go.Figure], Optional[go.Figure]]:
     comp_fig = None
     mult_fig = None
     red_fig = None
     if completeness is True:
-        comp_y, comp_x = generate_completeness_plot(hkl_orig=scan[2], all_hkl_orig=all_hkl_orig, parameters=parameters,
+        comp_y, comp_x = generate_completeness_plot(hkl_orig=data[1], all_hkl_orig=all_hkl_orig, parameters=parameters,
                                                     step=step)
         comp_df = {'x': comp_x, 'y': comp_y, 'color': 'blue'}
         comp_fig = px.line(comp_df, x='x', y='y')
@@ -737,7 +714,7 @@ def make_line_plot_graph(scan: Tuple[np.ndarray, ...], all_hkl_orig: np.ndarray,
         comp_fig.update_yaxes({'title': '%'})
 
     if multiplicity is True:
-        mult_y, mult_x = generate_multiplicity_plot(hkl_orig=scan[2], all_hkl_orig=all_hkl_orig, parameters=parameters,
+        mult_y, mult_x = generate_multiplicity_plot(hkl_orig=data[1], all_hkl_orig=all_hkl_orig, parameters=parameters,
                                                     step=step)
         mult_df = {'x': mult_x, 'y': mult_y, 'color': 'green'}
         mult_fig = px.line(mult_df, x='x', y='y')
@@ -747,7 +724,7 @@ def make_line_plot_graph(scan: Tuple[np.ndarray, ...], all_hkl_orig: np.ndarray,
         mult_fig.update_yaxes({'title': ''})
 
     if redundancy is True:
-        red_y, red_x = generate_redundancy_plot(hkl=scan[1], all_hkl_orig=all_hkl_orig, parameters=parameters,
+        red_y, red_x = generate_redundancy_plot(hkl=data[0], all_hkl_orig=all_hkl_orig, parameters=parameters,
                                                 step=step)
         red_df = {'x': red_x, 'y': red_y, 'color': 'red'}
         red_fig = px.line(red_df, x='x', y='y')
@@ -1709,9 +1686,8 @@ class CumulativeDataCalculator:
     hkl_all_e = None
     hkl_orig_all_e = None
     d_spacings_all = None
-
-    def __init__(self, parameters):
-        self.cell_parameters = parameters
+    parameters = None
+    cell_parameters = None
 
 
     def set_d_roi(self, roi):
@@ -1722,19 +1698,19 @@ class CumulativeDataCalculator:
         d_array = create_d_array(parameters=self.cell_parameters, hkl_array=decode_hkl(hkl_e))
         return d_array
 
-    def add_data(self, data):
-        assert isinstance(data, DiffractionData), 'DiffractionData wrong format'
+    def add_data(self, scandatacontainer):
+        assert isinstance(scandatacontainer, ScanDataContainer), 'DiffractionData wrong format'
         self.data_container[self.high_free_index] = {
-            'diff_vecs': data.diff_vecs,
-            'diff_angles': data.diff_angles,
-            'init_angles': data.init_angle,
-            'sweep': data.sweep,
-            'hkl_e': data.hkl_e,
-            'hkl_origin_e': data.hkl_origin_e,
+            'diff_vecs': scandatacontainer.diff_vecs,
+            'diff_angles': scandatacontainer.diff_angles,
+            'init_angles': scandatacontainer.start_angle,
+            'sweep': scandatacontainer.sweep,
+            'hkl_e': encode_hkl(scandatacontainer.hkl),
+            'hkl_origin_e': encode_hkl(scandatacontainer.hkl_origin),
             'ommited': False,
             'order': self.high_free_index,
             'angle_roi': None,
-            'd_spacings': self.create_spacings_for_hkl_e(data.hkl_e).reshape(-1)
+            'd_spacings': create_d_array(parameters=self.parameters,hkl_array=scandatacontainer.hkl).reshape(-1)
         }
 
         self.high_free_index += 1
@@ -1744,6 +1720,8 @@ class CumulativeDataCalculator:
         self.high_free_index = 0
         self.hkl_all_e = None
         self.hkl_orig_all_e = None
+        self.parameters = None
+        self.d_spacings_all = None
 
     def change_ommit_by_index(self, index, flag):
         assert index in tuple(self.data_container.keys()), f'There is no data with {index} index!'
@@ -1874,21 +1852,42 @@ class CumulativeDataCalculator:
         return completeness
 
 
-class DiffractionData():
-    def __init__(self,
-                 diff_vecs,
-                 hkl,
-                 hkl_origin,
-                 diff_angles,
-                 init_angle: float,
-                 sweep: float,
-                 ):
+class ScanDataContainer:
+    def __init__(self,diff_vecs, hkl, hkl_origin, diff_angles, scan_setup,start_angle, sweep):
         self.diff_vecs = diff_vecs
-        self.hkl_e = encode_hkl(hkl)
-        self.hkl_origin_e = encode_hkl(hkl_origin)
+        self.hkl = hkl
+        self.hkl_origin = hkl_origin
         self.diff_angles = diff_angles
-        self.init_angle = init_angle
+        self.scan_setup = scan_setup
+        self.start_angle = start_angle
         self.sweep = sweep
+
+class StrategyContainer:
+    scan_data_containers = []
+
+    def add_scan_data_container(self,sdc):
+        assert isinstance(sdc,ScanDataContainer), 'Wrong scan data format!'
+        self.scan_data_containers.append(sdc)
+
+    def clear_data(self):
+        self.scan_data_containers = []
+
+    def get_hkl(self):
+        hkl = []
+        for scan in self.scan_data_containers:
+            hkl.append(scan.hkl)
+        return hkl
+
+    def get_hkl_origin(self):
+        hkl_origin = []
+        for scan in self.scan_data_containers:
+            hkl_origin.append(scan.hkl_origin)
+        return hkl_origin
+
+    def hasdata(self):
+        if self.scan_data_containers: return True
+        else: return False
+
 
 
 if __name__ == '__main__':

@@ -143,4 +143,5 @@ aperture_value_error =  MODAL_TUPLE(header='Diamond anvil error',
 anvil_normal_not_defined = MODAL_TUPLE(header='Diamond anvil error',
                                          body='Anvil normal is not defined or incorrect')
 
-
+CDCC_no_data_error = MODAL_TUPLE(header='CDCC error',
+                                         body='No diffraction data to analyze')

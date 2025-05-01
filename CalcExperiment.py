@@ -1,7 +1,8 @@
 import numpy as np
 from pointsymmetry import PG_KEYS
-from Exceptions import CollisionError, InstrumentError, NoScanDataError
-from Modals_content import instrument_error_no_goniometer, calc_collision_error, MODAL_TUPLE, no_scan_data_to_save_error
+from Exceptions import CollisionError, InstrumentError, NoScanDataError, CDCCError
+from Modals_content import instrument_error_no_goniometer, calc_collision_error, MODAL_TUPLE, \
+    no_scan_data_to_save_error, CDCC_no_data_error
 from main import Sample, Ray_obstacle, DiamondAnvil
 import warnings
 import json
@@ -10,7 +11,8 @@ from my_logger import mylogger
 from typing import Optional, List, Tuple, Dict, Any, Union, Callable
 
 
-class Experiment():
+class Experiment:
+
     def __init__(self):
         self.hkl_origin_in_d_range = None
         self.hkl_in_d_range = None
@@ -37,11 +39,12 @@ class Experiment():
         self.det_complex = False
         self.det_complex_format = None
         self.det_row_col_spacing = None
-        self.scan_data = None
+        self.strategy_data_container = sf.StrategyContainer()
         self.diamond_anvil = None
         self.calc_anvil_flag = False
         self.data_anvil_flag = True
-        self.incident_beam_vec = np.array([1.,0.,0.])
+        self.incident_beam_vec = np.array([1., 0., 0.])
+        self.cdcc = sf.CumulativeDataCalculator()
 
     def set_wavelength(self, wavelength):
         self.wavelength = wavelength
@@ -179,15 +182,15 @@ class Experiment():
                                                                                        return_origin=True,
                                                                                        pg=self.pg,
                                                                                        centring=self.centring)
-            print(f'n of independent {len(np.unique(self.hkl_origin_in_d_range,axis=0))}')
+            print(f'n of independent {len(np.unique(self.hkl_origin_in_d_range, axis=0))}')
 
             if self.diamond_anvil and self.calc_anvil_flag:
                 self.hkl_in_d_range, self.hkl_origin_in_d_range = \
                     self.diamond_anvil.check_all_possible_anvil(ub_matr=self.cell.orient_matx, hkl=self.hkl_in_d_range,
                                                                 data=(self.hkl_in_d_range, self.hkl_origin_in_d_range),
                                                                 wavelength=self.wavelength, separate_back=False)[
-                                                                                                        'all_windows']
-            print(f'n of independent in bublic {len(np.unique(self.hkl_origin_in_d_range,axis=0))}')
+                        'all_windows']
+            print(f'n of independent in bublic {len(np.unique(self.hkl_origin_in_d_range, axis=0))}')
             self.centring_previous = self.centring
             self.pg_previous = self.pg
             self.d_range = d_range
@@ -201,28 +204,27 @@ class Experiment():
             hkl_origin_in = self.hkl_in_section
             pass
 
-        all_scan_data = tuple()
+        self.strategy_data_container.clear_data()
         for scan_n, scan in enumerate(self.scans):
             data = self.cell.scan(scan_type='???', no_of_scan=scan[4],
-                                         scan_sweep=scan[5],
-                                         wavelength=self.wavelength,
-                                         angles=scan[3], hkl_array=hkl_in,
-                                         hkl_array_orig=hkl_origin_in,
-                                         directions=self.axes_directions,
-                                         rotations=self.axes_rotations)
+                                  scan_sweep=scan[5],
+                                  wavelength=self.wavelength,
+                                  angles=scan[3], hkl_array=hkl_in,
+                                  hkl_array_orig=hkl_origin_in,
+                                  directions=self.axes_directions,
+                                  rotations=self.axes_rotations)
 
             if self.diamond_anvil and self.calc_anvil_flag:
                 data = self.diamond_anvil.filter_anvil(diff_vecs=data[0],
-                                                diff_angles=data[3],
-                                                rotation_axes=self.axes_rotations,
-                                                directions_axes=self.axes_directions,
-                                                initial_axes_angles= scan[3],
-                                                scan_axis_index=scan[4],
-                                                data=data,
-                                                mode='transmit',
-                                                incident_beam=self.incident_beam_vec
-                )
-
+                                                       diff_angles=data[3],
+                                                       rotation_axes=self.axes_rotations,
+                                                       directions_axes=self.axes_directions,
+                                                       initial_axes_angles=scan[3],
+                                                       scan_axis_index=scan[4],
+                                                       data=data,
+                                                       mode='transmit',
+                                                       incident_beam=self.incident_beam_vec
+                                                       )
 
             if self.det_geometry is not None:
                 detector = Ray_obstacle(dist=scan[0], geometry=self.det_geometry, height=self.det_height, rot=scan[1],
@@ -256,9 +258,11 @@ class Experiment():
                                              height=obstacle[5],
                                              width=obstacle[6], diameter=obstacle[7])
                     data = obstacle_.filter(diff_vecs=data[0], data=data, mode='shade')
-            all_scan_data += (data,)
+            scan_container = sf.ScanDataContainer(diff_vecs=data[0], hkl=data[1], hkl_origin=data[2],
+                                                  diff_angles=data[3],
+                                                  scan_setup=scan, start_angle=scan[3][scan[4]], sweep=scan[5])
+            self.strategy_data_container.add_scan_data_container(sdc=scan_container)
 
-        self.scan_data = all_scan_data
         self.data_anvil_flag = True if self.data_anvil_flag and self.calc_anvil_flag else False
 
         if hasattr(self, 'known_space'):
@@ -270,6 +274,7 @@ class Experiment():
         return True, None
 
     def load_hkls(self, hkl_str_list, pg=None, centring=None):
+        self.strategy_data_container.clear_data()
         data = list()
         if pg is None: pg = self.pg
         if centring is None: centring = self.centring
@@ -281,11 +286,12 @@ class Experiment():
             d_max_ = max(d_array)
             hkl_array_orig = sf.generate_original_hkl_for_hkl_array(hkl_array, pg=pg, parameters=self.parameters,
                                                                     centring=centring)
-            data += [(None, hkl_array, hkl_array_orig, None), ]
+            sdc = sf.ScanDataContainer(diff_vecs=None, hkl=hkl_array, hkl_origin=hkl_array_orig, diff_angles=None,
+                                       scan_setup=None, start_angle=None, sweep=None)
             if d_min is None or d_min > d_min_: d_min = d_min_
             if d_max is None or d_max > d_max_: d_max = d_max_
         d_range = (d_min, d_max)
-        self.scan_data = data
+        self.strategy_data_container.add_scan_data_container(sdc)
         self.hkl_in_d_range, self.hkl_origin_in_d_range = self.cell.gen_hkl_arrays(type='d_range', d_range=d_range,
                                                                                    return_origin=True, pg=self.pg,
                                                                                    centring=self.centring)
@@ -295,38 +301,65 @@ class Experiment():
         self.diamond_anvil = DiamondAnvil(normal=anvil_normal, aperture=aperture)
         pass
 
-    def _generate_unique_scan_data(self, scan1, scan2):
-        hkl1 = scan1[1]
-        hkl2 = scan2[1]
+    def _generate_unique_scan_data(self, hkl1, hkl1_original, hkl2):
         boolarr1, boolarr2 = sf.bool_not_intersecting_hkl(hkl1, hkl2)
-        unique1 = [data[boolarr1[:, 0]] if not (data is None) else None for data in scan1]
-        unique2 = [data[boolarr2[:, 0]] if not (data is None) else None for data in scan2]
-        return unique1, unique2
+        unique1 = [data[boolarr1[:, 0]] if not (data is None) else None for data in [hkl1, hkl1_original]]
+        return unique1
 
     def separate_unique_common(self):
-        assert self.scan_data is not None and len(self.scan_data) >= 2, 'Provide at least 2 scan'
+        assert len(self.strategy_data_container.scan_data_containers) >= 2, 'Provide at least 2 scan'
         # TODO make appropriate error handling
         unique_lists = []
-        for i, scan_main in enumerate(self.scan_data):
+        for i, (hkl_main, hkl_main_origin) in enumerate(
+                zip(self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin())):
             scan_unique_list = []
-            for j, scan_comparison in enumerate(self.scan_data):
+            for j, hkl_comparison in enumerate(self.strategy_data_container.get_hkl()):
                 if i != j:
-                    unique_, rest = self._generate_unique_scan_data(scan_main, scan_comparison)
+                    unique_ = self._generate_unique_scan_data(hkl_main, hkl_main_origin, hkl_comparison)
                     scan_unique_list.append(unique_)
                 else:
                     continue
             unique_lists.append(scan_unique_list)
         hkl_list = []
-        for scan in self.scan_data:
-            hkl_list.append(scan[1])
+        for hkl in self.strategy_data_container.get_hkl():
+            hkl_list.append(hkl)
         intersection_indices = sf.bool_intersecting_elements(hkl_list)
-        intersection_data = [data[intersection_indices[:, 0]] if not (data is None) else None for data in
-                             self.scan_data[0]]
-        new_scan_data = []
-        for scan, unique_ in zip(self.scan_data, unique_lists):
-            new_scan_data.extend((scan, *unique_))
-        new_scan_data.append(intersection_data)
-        self.scan_data = new_scan_data
+
+        hkl_intersec, hkl_origin_intersec = [data[intersection_indices[:, 0]] if not (data is None) else None for data
+                                             in
+                                             (self.strategy_data_container.get_hkl()[0],
+                                              self.strategy_data_container.get_hkl_origin()[0])]
+        old_data_hkl = [self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()]
+        old_data_hkl_ = []
+        for i, j in zip(*old_data_hkl):
+            old_data_hkl_.append((i,j))
+        old_data_hkl = old_data_hkl_
+
+        # for i in self.strategy_data_container.get_hkl():
+        #     print(f'hkl shape: {i.shape}')
+        #
+        # for i in self.strategy_data_container.get_hkl_origin():
+        #     print(f'hkl_o shape: {i.shape}')
+        #
+        # for i,j in old_data_hkl:
+        #     print(f'hkl shape: {i.shape} hkl_o shape{j.shape}')
+
+        self.strategy_data_container.clear_data()
+        for scan, scan_unique_list_ in zip(old_data_hkl, unique_lists):
+            sdc_old = sf.ScanDataContainer(diff_vecs=None, diff_angles=None, hkl=scan[0], hkl_origin=scan[1],
+                                           scan_setup=None, start_angle=None, sweep=None)
+            self.strategy_data_container.add_scan_data_container(sdc_old)
+            for unique_ in scan_unique_list_:
+                sdc_unique = sf.ScanDataContainer(diff_vecs=None, diff_angles=None, hkl=unique_[0],
+                                                  hkl_origin=unique_[1], scan_setup=None, start_angle=None, sweep=None)
+                self.strategy_data_container.add_scan_data_container(sdc_unique)
+
+        sdc_intersec = sf.ScanDataContainer(diff_vecs=None, diff_angles=None, hkl=hkl_intersec,
+                                            hkl_origin=hkl_origin_intersec, scan_setup=None, start_angle=None,
+                                            sweep=None)
+        self.strategy_data_container.add_scan_data_container(sdc_intersec)
+        for i,j in zip(self.strategy_data_container.get_hkl(),self.strategy_data_container.get_hkl_origin()):
+            print(f'hkl shape: {i.shape} hkl_o shape{j.shape}')
 
     def set_logic_collision(self, collision_list):
         self.logic_collision = collision_list
@@ -381,51 +414,51 @@ class Experiment():
                                  body=''.join((calc_collision_error.body, *report_body_add)))
             raise CollisionError(report)
 
-    def show_completeness_(self, runs='all'):
-        if runs == 'all':
-            data = sf.unite_runs_data(self.scan_data, runs='all')
-        else:
-            data = sf.unite_runs_data(self.scan_data, runs)
-        completeness = sf.show_completness(data, self.hkl_origin_in_d_range)
-        return completeness
+    def _get_filtered_hkl_origin(self, runs='all'):
+        hkl_origin_list = self.strategy_data_container.get_hkl_origin()
+        if runs != 'all':
+            hkl_origin_list = [hkl_origin_list[i] for i in runs]
+        hkl_origin_array = np.vstack(hkl_origin_list)
+        return hkl_origin_array
 
-    def show_redundancy_(self, runs='all'):
-        if runs == 'all':
-            data = sf.unite_runs_data(self.scan_data, runs='all')
-        else:
-            data = sf.unite_runs_data(self.scan_data, runs)
-        redundancy = sf.show_redundancy_V2(data, self.hkl_origin_in_d_range)
-        return redundancy
+    def show_completeness(self, runs='all'):
+        hkl_origin = self._get_filtered_hkl_origin(runs)
+        return sf.show_completness(hkl_origin, self.hkl_origin_in_d_range)
 
-    def show_multiplicity_(self, runs='all'):
-        if runs == 'all':
-            data = sf.unite_runs_data(self.scan_data, runs='all')
-        else:
-            data = sf.unite_runs_data(self.scan_data, runs)
-        multiplicity = sf.show_multiplicity_V2(data, self.hkl_origin_in_d_range)
-        return multiplicity
+    def show_redundancy(self, runs='all'):
+        hkl_origin = self._get_filtered_hkl_origin(runs)
+        return sf.show_redundancy_V2(hkl_origin, self.hkl_origin_in_d_range)
+
+    def show_multiplicity(self, runs='all'):
+        hkl_origin = self._get_filtered_hkl_origin(runs)
+        return sf.show_multiplicity_V2(hkl_origin, self.hkl_origin_in_d_range)
 
     def generate_1d_result_plot(self, runs='all', completeness=True, redundancy=True, multiplicity=True):
-        if runs == 'all':
-            data = sf.unite_runs_data(self.scan_data, runs='all')
-        else:
-            data = sf.unite_runs_data(self.scan_data, runs)
-        figs_1d = sf.make_line_plot_graph(scan=data, all_hkl_orig=self.hkl_origin_in_d_range,
+        hkl_origin_list = self.strategy_data_container.get_hkl_origin()
+        hkl_list = self.strategy_data_container.get_hkl()
+        if runs != 'all':
+            hkl_origin_list = [hkl_origin_list[i] for i in runs]
+            hkl_list = [hkl_list[i] for i in runs]
+        hkl_origin_array = np.vstack(hkl_origin_list)
+        hkl_array = np.vstack(hkl_list)
+        data = (hkl_array, hkl_origin_array)
+        figs_1d = sf.make_line_plot_graph(data=data, all_hkl_orig=self.hkl_origin_in_d_range,
                                           parameters=self.parameters, step=0.1,
                                           completeness=True, redundancy=True, multiplicity=True)
         self.figs_1d = figs_1d
         return figs_1d
 
     def visualize_hkl_data(self, data, visualise=True):
-        sf.visualize_scans_known_hkl(data, all_hkl=self.hkl_in_d_range,
+        data = [self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()]
+        sf.visualize_scans_known_hkl(scans=data, all_hkl=self.hkl_in_d_range,
                                      all_hkl_orig=self.hkl_origin_in_d_range, visualise=visualise, trash_unknown=True,
                                      cryst_coord=True,
                                      b_matr=self.cell.b_matrix, )
         pass
 
     def generate_known_space_3d(self, visualise=False):
-        print(self.data_anvil_flag)
-        fig = sf.visualize_scans_space(self.scan_data, all_hkl=self.hkl_in_d_range,
+        data = [self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()]
+        fig = sf.visualize_scans_space(data, all_hkl=self.hkl_in_d_range,
                                        all_hkl_orig=self.hkl_origin_in_d_range, pg=self.pg, visualise=visualise,
                                        trash_unknown=False, cryst_coord=False, b_matr=self.cell.b_matrix,
                                        restore_hkl_by_pg=self.data_anvil_flag)
@@ -433,7 +466,8 @@ class Experiment():
         return fig
 
     def generate_known_hkl_3d(self, visualise=False):
-        fig = sf.visualize_scans_known_hkl(scans=self.scan_data, all_hkl=self.hkl_in_d_range,
+        data = [self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()]
+        fig = sf.visualize_scans_known_hkl(data, all_hkl=self.hkl_in_d_range,
                                            all_hkl_orig=self.hkl_origin_in_d_range, visualise=visualise,
                                            trash_unknown=False,
                                            cryst_coord=False, b_matr=self.cell.b_matrix, )
@@ -441,7 +475,8 @@ class Experiment():
         return fig
 
     def generate_known_hkl_orig_3d(self, visualise=False):
-        fig = sf.visualize_scans_known_hkl_orig(scans=self.scan_data, all_hkl_orig=self.hkl_origin_in_d_range,
+        data = [self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()]
+        fig = sf.visualize_scans_known_hkl_orig(scans=data, all_hkl_orig=self.hkl_origin_in_d_range,
                                                 visualise=visualise, trash_unknown=False,
                                                 cryst_coord=False, b_matr=self.cell.b_matrix, )
         self.known_hkl_orig = fig
@@ -527,10 +562,10 @@ class Experiment():
         return False
 
     def form_scan_data_as_hkl(self):
-        if not self.scan_data:
+        if not self.strategy_data_container.hasdata():
             raise NoScanDataError(modal=no_scan_data_to_save_error)
 
-        hkl_arrays_list = [scan[1] for scan in self.scan_data]
+        hkl_arrays_list = self.strategy_data_container.get_hkl()
         hkl_array = np.vstack(hkl_arrays_list)
         lines = []
         for hkl in hkl_array:
@@ -682,6 +717,14 @@ class Experiment():
             runs_tables.append(table)
         return runs_tables, table_num
 
+    def refresh_cdcc(self):
+        if not self.strategy_data_container.hasdata(): raise CDCCError(modal=CDCC_no_data_error)
+        self.cdcc.clear_data()
+        self.cdcc.parameters = self.cell.parameters
+        self.cdcc.add_all_hkl(hkl_all=self.hkl_in_d_range, hkl_orig_all=self.hkl_origin_in_d_range)
+        for hkl, hkl_orig in zip(self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()):
+            pass
+
 
 import service_functions as sf
 
@@ -694,7 +737,7 @@ if __name__ == '__main__':
     ])
     parameters = [15, 15, 15, 90.000, 90, 90]
     # exp2.set_cell(matr=UB)
-    exp2.set_cell(parameters=parameters,om_chi_phi=(0,0,0))
+    exp2.set_cell(parameters=parameters, om_chi_phi=(0, 0, 0))
     exp2.set_pg('2/m')
     exp2.set_centring('P')
     exp2.set_wavelength(0.710730)
@@ -702,17 +745,17 @@ if __name__ == '__main__':
     angles = [
         [0, 54.71, 0],
 
-        [120,80,0],
+        [120, 80, 0],
 
-        [240,200,0],
+        [240, 200, 0],
         # [0, 0, 20, -90],
         # [0, 0, 40, -90],
         # [0, 0, 60, -90],
         # [0, 0, 80, -90],
     ]
-    rotation_dirs = (-1,-1,1)
+    rotation_dirs = (-1, -1, 1)
     aperture = 40
-    anvil_normal = np.array([1.,0.,0.])
+    anvil_normal = np.array([1., 0., 0.])
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle in angles:
@@ -722,49 +765,7 @@ if __name__ == '__main__':
     # exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
     # exp2.calc_anvil_flag=True
 
-
     exp2.calc_experiment(d_range=(0.68, 20))
-    data = exp2.scan_data
+    # data = exp2.scan_data
     scan_inputs = exp2.scans
     data_list = []
-    for scan,run in zip(scan_inputs,data):
-        axis_index = scan[4]
-        data_list.append(sf.DiffractionData(diff_vecs=run[0],
-                                            hkl=run[1],
-                                            hkl_origin=run[2],
-                                            diff_angles=run[3],
-                                            init_angle=scan[3][axis_index],
-                                            sweep=scan[5]
-        ))
-    # handler_test = sf.CumulativeDataHandler(parameters=exp2.cell.parameters)
-    # handler_test.add_all_hkl(hkl_all=exp2.hkl_in_d_range,hkl_orig_all=exp2.hkl_origin_in_d_range)
-    # for data in data_list:
-    #     handler_test.add_data(data)
-
-
-    # new_roi = [np.deg2rad(0),np.deg2rad(50)]
-    # handler_test.data_container[2]['angle_roi'] = new_roi
-
-
-    com,per = handler_test.calc_cumulative_completeness(order_by_decrement=True)
-    print(com,per)
-    # handler_test.data_container = handler_test.shuffle_dict_by_permutation(handler_test.data_container,per)
-    handler_test.set_d_roi([1,20])
-    com,per = handler_test.calc_cumulative_completeness()
-    print(com,per)
-
-    # hkl_text = exp2.form_scan_data_as_hkl()
-    #
-    # with open('Piva_2.36GPa_in_P1.hkl', 'r') as f:
-    #     a = f.read()
-    # exp2.load_hkls([a],pg=-1,centring='P')
-    # exp2.separate_unique_common()
-    # exp2.generate_known_space_3d(visualise=True)
-    # exp1.set_logic_collision(collision)
-    # exp1.check_collision_v2()
-
-    # with open('image_.hkl','r') as f:
-    #     str = f.read()
-    # exp2.load_hkls([str],)
-    # fig = exp2.generate_known_space_3d()
-    # fig.show()

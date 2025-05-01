@@ -2259,7 +2259,7 @@ def calc_experiment(n_clicks, children
             no_upd,
             no_upd, no_upd, no_upd)
 
-    completeness = f'{exp1.show_completeness_():.2f}'
+    completeness = f'{exp1.show_completeness():.2f}'
 
     if exp1.det_geometry is None:
         return completeness, list((True, calc_exp_no_det_warn.header, calc_exp_no_det_warn.body)), {
@@ -2271,10 +2271,10 @@ def calc_experiment(n_clicks, children
           Input('separate_unique_common_btn', 'n_clicks'),
           prevent_initial_call=True
           )
-def separate_u_c(n_clicks):
+def separate_uiq_comm(n_clicks):
     if n_clicks == 0:
         raise dash.exceptions.PreventUpdate()
-    if exp1.scan_data is None or len(exp1.scan_data) < 2:
+    if not exp1.strategy_data_container.hasdata() or len(exp1.strategy_data_container.scan_data_containers) < 2:
         return (True, separate_unique_common_error.header, separate_unique_common_error.body)
     exp1.separate_unique_common()
     return no_upd
@@ -2354,7 +2354,7 @@ def show_known_space(n_clicks):
         content_vars.active_space_fig = sf.plotly_fig(fig)
         return list((False, '', '')), fig
     else:
-        if hasattr(exp1, 'scan_data'):
+        if exp1.strategy_data_container.hasdata():
             if exp1.cell.cell_vol > 64000:
                 return list((True, show_rec_cell_volume_error.header, show_rec_cell_volume_error.body)), no_upd
             fig = copy.copy(exp1.generate_known_space_3d())
@@ -2380,7 +2380,7 @@ def show_known_hkl(n_clicks):
         content_vars.active_space_fig = sf.plotly_fig(fig)
         return list((False, '', '')), fig
     else:
-        if hasattr(exp1, 'scan_data'):
+        if exp1.strategy_data_container.hasdata():
             if exp1.cell.cell_vol > 64000:
                 return list((True, show_rec_cell_volume_error.header, show_rec_cell_volume_error.body)), no_upd
             fig = copy.copy(exp1.generate_known_hkl_3d())
@@ -2405,7 +2405,7 @@ def show_known_hkl_orig(n_clicks):
         content_vars.active_space_fig = sf.plotly_fig(fig)
         return list((False, '', '')), fig
     else:
-        if hasattr(exp1, 'scan_data'):
+        if exp1.strategy_data_container.hasdata():
             if exp1.cell.cell_vol > 64000:
                 return list((True, show_rec_cell_volume_error.header, show_rec_cell_volume_error.body)), no_upd
             fig = copy.copy(exp1.generate_known_hkl_orig_3d())
