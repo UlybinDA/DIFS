@@ -965,6 +965,10 @@ fourth_page = html.Div([
                    'height': '500px',
                    'width': '1000px'}
         ),
+        html.Div([
+            html.H6('Cumulative completeness'),
+
+        ])
     ],
         id='div_plots_container',
         style={'display': 'block'}

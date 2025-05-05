@@ -8,6 +8,7 @@ import warnings
 import json
 import app_gens as apg
 from my_logger import mylogger
+import plotly.graph_objs as go
 from typing import Optional, List, Tuple, Dict, Any, Union, Callable
 
 
@@ -335,15 +336,6 @@ class Experiment:
             old_data_hkl_.append((i,j))
         old_data_hkl = old_data_hkl_
 
-        # for i in self.strategy_data_container.get_hkl():
-        #     print(f'hkl shape: {i.shape}')
-        #
-        # for i in self.strategy_data_container.get_hkl_origin():
-        #     print(f'hkl_o shape: {i.shape}')
-        #
-        # for i,j in old_data_hkl:
-        #     print(f'hkl shape: {i.shape} hkl_o shape{j.shape}')
-
         self.strategy_data_container.clear_data()
         for scan, scan_unique_list_ in zip(old_data_hkl, unique_lists):
             sdc_old = sf.ScanDataContainer(diff_vecs=None, diff_angles=None, hkl=scan[0], hkl_origin=scan[1],
@@ -432,6 +424,43 @@ class Experiment:
     def show_multiplicity(self, runs='all'):
         hkl_origin = self._get_filtered_hkl_origin(runs)
         return sf.show_multiplicity_V2(hkl_origin, self.hkl_origin_in_d_range)
+
+    def generate_1d_comp_cumulative_plot(self,run_indices=None):
+        hkl_origin_list = self.strategy_data_container.get_hkl_origin()
+        if not run_indices: run_indices = tuple(range(len(hkl_origin_list)))
+        ordered_hkl_orig = [hkl_origin_list[i] for i in run_indices]
+        comp_y, comp_x = [],[]
+        hkl_origin_ = np.array([]).reshape(-1,3)
+        for hkl_ in ordered_hkl_orig:
+            hkl_origin_ = np.vstack((hkl_origin_,hkl_))
+            comp_y_, comp_x_ = sf.generate_completeness_plot(hkl_orig=hkl_origin_,all_hkl_orig=self.hkl_origin_in_d_range,
+                                                           parameters=self.cell.parameters,step=.1)
+            comp_y.append(comp_y_)
+            comp_x.append(comp_x_)
+        fig = go.Figure()
+        fig.add_hline(y=100, line_dash="dash", line_color="black", annotation_text="100",
+                      annotation_position="bottom right")
+
+        for n, (x,y) in enumerate(zip(comp_x,comp_y)):
+            name = ' + '.join([str(i) for i in run_indices[:n+1]])
+
+            fig.add_trace((go.Scatter(
+                x = x,
+                y = y,
+                mode='lines+markers',  # Shows both lines and markers
+                name=f'Runs {name}',
+                fill='tonexty'
+            )))
+        fig.update_layout(
+            title='Cumulative completeness',
+        )
+        fig.update_traces(line_width=3)
+        fig.update_xaxes({'title': 'd, Å'})
+        fig.update_yaxes({'title': '%'})
+        fig['layout']['xaxis']['autorange'] = "reversed"
+        return fig
+
+
 
     def generate_1d_result_plot(self, runs='all', completeness=True, redundancy=True, multiplicity=True):
         hkl_origin_list = self.strategy_data_container.get_hkl_origin()
@@ -738,7 +767,7 @@ if __name__ == '__main__':
     parameters = [15, 15, 15, 90.000, 90, 90]
     # exp2.set_cell(matr=UB)
     exp2.set_cell(parameters=parameters, om_chi_phi=(0, 0, 0))
-    exp2.set_pg('2/m')
+    exp2.set_pg('1')
     exp2.set_centring('P')
     exp2.set_wavelength(0.710730)
     goniometer_system = 'zxz'
@@ -754,8 +783,8 @@ if __name__ == '__main__':
         # [0, 0, 80, -90],
     ]
     rotation_dirs = (-1, -1, 1)
-    aperture = 40
-    anvil_normal = np.array([1., 0., 0.])
+    # aperture = 40
+    # anvil_normal = np.array([1., 0., 0.])
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle in angles:
@@ -764,8 +793,9 @@ if __name__ == '__main__':
 
     # exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
     # exp2.calc_anvil_flag=True
-
     exp2.calc_experiment(d_range=(0.68, 20))
+    fig2 = exp2.generate_1d_comp_cumulative_plot()
+    fig2.show()
     # data = exp2.scan_data
-    scan_inputs = exp2.scans
-    data_list = []
+    # scan_inputs = exp2.scans
+    # data_list = []
