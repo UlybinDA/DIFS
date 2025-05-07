@@ -1686,7 +1686,6 @@ class CumulativeDataCalculator:
     hkl_all_e = None
     hkl_orig_all_e = None
     d_spacings_all = None
-    parameters = None
     cell_parameters = None
 
 
@@ -1710,7 +1709,7 @@ class CumulativeDataCalculator:
             'ommited': False,
             'order': self.high_free_index,
             'angle_roi': None,
-            'd_spacings': create_d_array(parameters=self.parameters,hkl_array=scandatacontainer.hkl).reshape(-1)
+            'd_spacings': create_d_array(parameters=self.cell_parameters,hkl_array=scandatacontainer.hkl).reshape(-1)
         }
 
         self.high_free_index += 1
@@ -1720,8 +1719,20 @@ class CumulativeDataCalculator:
         self.high_free_index = 0
         self.hkl_all_e = None
         self.hkl_orig_all_e = None
-        self.parameters = None
+        self.cell_parameters = None
         self.d_spacings_all = None
+
+    def get_data_for_cumulative_plot(self):
+        hkl_original_e_list = []
+        for run_data in self.data_container:
+            bool_mask = self.gen_bool_mask(run_data)
+            hkl_original_ = run_data['hkl_origin_e'][bool_mask].reshape(-1)
+            hkl_original_e_list.append(hkl_original_)
+        bool_mask =self.gen_d_roi_bool_mask(self.d_spacings_all)
+        all_origin_e = self.hkl_orig_all_e[bool_mask].reshape(-1)
+        return hkl_original_e_list,all_origin_e
+
+
 
     def change_ommit_by_index(self, index, flag):
         assert index in tuple(self.data_container.keys()), f'There is no data with {index} index!'
@@ -1769,9 +1780,12 @@ class CumulativeDataCalculator:
         bool_ = d_bool & sweep_bool
         return bool_
 
-    def calc_cumulative_completeness(self, order_by_decrement=True):
+    def calc_cumulative_completeness(self, order_by_decrement=True,permutation_indices=None):
         completeness_list = []
-        runs_data = self.data_container
+        if not order_by_decrement and permutation_indices:
+            runs_data = self.shuffle_dict_by_permutation(self.data_container,permutation_indices)
+        else:
+            runs_data = self.data_container
         ommited_list = []
         runs_order = []
         dynamic_ommition = []
@@ -1838,6 +1852,15 @@ class CumulativeDataCalculator:
         completeness = self.completeness(hkl_original=hkl, all_original_hkl=self.hkl_orig_all_e,cut_d=True)
         return completeness
 
+    def all_runs_bool_masks(self):
+        bool_masks = []
+        for run_data in self.data_container.values():
+            bool_mask_ = self.gen_bool_mask(run_data=run_data)
+            bool_masks.append(bool_mask_)
+        all_origin_mask = self.gen_d_roi_bool_mask(self.d_spacings_all)
+        return bool_masks, all_origin_mask
+
+
     def completeness(self, hkl_original, all_original_hkl,cut_d=False):
         if cut_d:
             bool_a_ = self.gen_d_roi_bool_mask(self.d_spacings_all)
@@ -1878,6 +1901,11 @@ class StrategyContainer:
             hkl.append(scan.hkl)
         return hkl
 
+    def get_hkl_roi(self, d_low,d_high,diffraction_angles_roi):
+        pass
+
+
+
     def get_hkl_origin(self):
         hkl_origin = []
         for scan in self.scan_data_containers:
@@ -1888,7 +1916,38 @@ class StrategyContainer:
         if self.scan_data_containers: return True
         else: return False
 
+def create_cumulative_fig(ordered_hkl_orig,run_indices,parameters,hkl_origin_in_d_range):
 
+    comp_y, comp_x = [], []
+    hkl_origin_ = np.array([]).reshape(-1, 3)
+    for hkl_ in ordered_hkl_orig:
+        hkl_origin_ = np.vstack((hkl_origin_, hkl_))
+        comp_y_, comp_x_ = generate_completeness_plot(hkl_orig=hkl_origin_, all_hkl_orig=hkl_origin_in_d_range,
+                                                         parameters=parameters, step=.1)
+        comp_y.append(comp_y_)
+        comp_x.append(comp_x_)
+    fig = go.Figure()
+    fig.add_hline(y=100, line_dash="dash", line_color="black", annotation_text="100",
+                  annotation_position="bottom right")
+
+    for n, (x, y) in enumerate(zip(comp_x, comp_y)):
+        name = ' + '.join([str(i) for i in run_indices[:n + 1]])
+
+        fig.add_trace((go.Scatter(
+            x=x,
+            y=y,
+            mode='lines+markers',  # Shows both lines and markers
+            name=f'Runs {name}',
+            fill='tonexty'
+        )))
+    fig.update_layout(
+        title='Cumulative completeness',
+    )
+    fig.update_traces(line_width=3)
+    fig.update_xaxes({'title': 'd, Å'})
+    fig.update_yaxes({'title': '%'})
+    fig['layout']['xaxis']['autorange'] = "reversed"
+    return fig
 
 if __name__ == '__main__':
     load_hklf4('Z4.hkl')

@@ -425,39 +425,15 @@ class Experiment:
         hkl_origin = self._get_filtered_hkl_origin(runs)
         return sf.show_multiplicity_V2(hkl_origin, self.hkl_origin_in_d_range)
 
-    def generate_1d_comp_cumulative_plot(self,run_indices=None):
+    def generate_1d_comp_cumulative_plot(self,order=True,permutation_indices=None):
+        completeness_list, run_indices = self.cdcc.calc_cumulative_completeness(order,permutation_indices)
+        run_bool_masks,all_hkl_origin_mask = self.cdcc.all_runs_bool_masks()
+        run_bool_masks = [i.reshape(-1,1) if i is not True else i for i in run_bool_masks]
+        all_hkl_origin_mask = all_hkl_origin_mask.reshape(-1,1) if all_hkl_origin_mask is not True else all_hkl_origin_mask
         hkl_origin_list = self.strategy_data_container.get_hkl_origin()
-        if not run_indices: run_indices = tuple(range(len(hkl_origin_list)))
-        ordered_hkl_orig = [hkl_origin_list[i] for i in run_indices]
-        comp_y, comp_x = [],[]
-        hkl_origin_ = np.array([]).reshape(-1,3)
-        for hkl_ in ordered_hkl_orig:
-            hkl_origin_ = np.vstack((hkl_origin_,hkl_))
-            comp_y_, comp_x_ = sf.generate_completeness_plot(hkl_orig=hkl_origin_,all_hkl_orig=self.hkl_origin_in_d_range,
-                                                           parameters=self.cell.parameters,step=.1)
-            comp_y.append(comp_y_)
-            comp_x.append(comp_x_)
-        fig = go.Figure()
-        fig.add_hline(y=100, line_dash="dash", line_color="black", annotation_text="100",
-                      annotation_position="bottom right")
-
-        for n, (x,y) in enumerate(zip(comp_x,comp_y)):
-            name = ' + '.join([str(i) for i in run_indices[:n+1]])
-
-            fig.add_trace((go.Scatter(
-                x = x,
-                y = y,
-                mode='lines+markers',  # Shows both lines and markers
-                name=f'Runs {name}',
-                fill='tonexty'
-            )))
-        fig.update_layout(
-            title='Cumulative completeness',
-        )
-        fig.update_traces(line_width=3)
-        fig.update_xaxes({'title': 'd, Å'})
-        fig.update_yaxes({'title': '%'})
-        fig['layout']['xaxis']['autorange'] = "reversed"
+        ordered_list = [hkl_origin_list[i][run_bool_masks[i][:,0]] if run_bool_masks[i] is not True else hkl_origin_list[i] for i in run_indices]
+        hkl_origin_in_d_range = self.hkl_origin_in_d_range[all_hkl_origin_mask[:,0]] if all_hkl_origin_mask is not True else self.hkl_origin_in_d_range
+        fig = sf.create_cumulative_fig(ordered_list,run_indices,self.cell.parameters,hkl_origin_in_d_range)
         return fig
 
 
@@ -749,10 +725,10 @@ class Experiment:
     def refresh_cdcc(self):
         if not self.strategy_data_container.hasdata(): raise CDCCError(modal=CDCC_no_data_error)
         self.cdcc.clear_data()
-        self.cdcc.parameters = self.cell.parameters
+        self.cdcc.cell_parameters = self.cell.parameters
         self.cdcc.add_all_hkl(hkl_all=self.hkl_in_d_range, hkl_orig_all=self.hkl_origin_in_d_range)
-        for hkl, hkl_orig in zip(self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()):
-            pass
+        for sdc in self.strategy_data_container.scan_data_containers:
+            self.cdcc.add_data(sdc)
 
 
 import service_functions as sf
@@ -767,34 +743,41 @@ if __name__ == '__main__':
     parameters = [15, 15, 15, 90.000, 90, 90]
     # exp2.set_cell(matr=UB)
     exp2.set_cell(parameters=parameters, om_chi_phi=(0, 0, 0))
-    exp2.set_pg('1')
+    exp2.set_pg('2/m')
     exp2.set_centring('P')
     exp2.set_wavelength(0.710730)
     goniometer_system = 'zxz'
     angles = [
         [0, 54.71, 0],
 
-        [120, 80, 0],
+        [120, 54.71, 0],
 
-        [240, 200, 0],
+        [240, 54.71, 0],
         # [0, 0, 20, -90],
         # [0, 0, 40, -90],
         # [0, 0, 60, -90],
         # [0, 0, 80, -90],
     ]
+    sweeps = [50,100,150]
     rotation_dirs = (-1, -1, 1)
     # aperture = 40
     # anvil_normal = np.array([1., 0., 0.])
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
-    for angle in angles:
+    for angle,sweep in zip(angles,sweeps):
         exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=angle, scan=2,
-                      sweep=50, )
+                      sweep=sweep, )
 
     # exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
     # exp2.calc_anvil_flag=True
     exp2.calc_experiment(d_range=(0.68, 20))
-    fig2 = exp2.generate_1d_comp_cumulative_plot()
+    exp2.refresh_cdcc()
+    angle1 = np.deg2rad(0)
+    angle2 = np.deg2rad(10)
+    # exp2.cdcc.data_container[2]['angle_roi']=(angle1,angle2)
+    exp2.cdcc.set_d_roi((50,4))
+    # exp2.cdcc.data_container[1]['ommited']=True
+    fig2 = exp2.generate_1d_comp_cumulative_plot(order=True,permutation_indices=(2,0,1))
     fig2.show()
     # data = exp2.scan_data
     # scan_inputs = exp2.scans
