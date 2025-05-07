@@ -2319,7 +2319,7 @@ def load_hkl(contents):
         except HKLFormatError as e:
             return no_upd, no_upd, None, (True, e.error_modal_content.header, e.error_modal_content.body)
     exp1.load_hkls(hkl_list)
-    completeness = f'{exp1.show_completeness_():.2f}'
+    completeness = f'{exp1.show_completeness():.2f}'
     return completeness, completeness, None, no_upd
 
 

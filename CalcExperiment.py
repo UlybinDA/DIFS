@@ -289,10 +289,10 @@ class Experiment:
                                                                     centring=centring)
             sdc = sf.ScanDataContainer(diff_vecs=None, hkl=hkl_array, hkl_origin=hkl_array_orig, diff_angles=None,
                                        scan_setup=None, start_angle=None, sweep=None)
+            self.strategy_data_container.add_scan_data_container(sdc)
             if d_min is None or d_min > d_min_: d_min = d_min_
             if d_max is None or d_max > d_max_: d_max = d_max_
         d_range = (d_min, d_max)
-        self.strategy_data_container.add_scan_data_container(sdc)
         self.hkl_in_d_range, self.hkl_origin_in_d_range = self.cell.gen_hkl_arrays(type='d_range', d_range=d_range,
                                                                                    return_origin=True, pg=self.pg,
                                                                                    centring=self.centring)
