@@ -4,7 +4,6 @@ import plotly.graph_objs as go
 import re
 
 import rgb_colors
-from colorama import Back
 from main import Sample
 from my_logger import mylogger
 from pointsymmetry import PG_KEYS, multiply_hkl_by_pg, generate_hkl_by_pg, generate_orig_hkl_array
@@ -14,7 +13,7 @@ from scipy.spatial.transform import Rotation as R
 import base64
 from CalcExperiment import Experiment
 import json
-from Exceptions import RunsDictError, HKLFormatError, WrongHKLShape
+from Exceptions import RunsDictError, HKLFormatError, WrongHKLShape, CalcCumulativeCompletenessError
 from Modals_content import *
 from encode_hkl import encode_hkl
 from typing import Tuple, List, Dict, Union, Optional, Any
@@ -606,17 +605,20 @@ def show_completness(hkl_origin: np.ndarray, all_hkl_orig: np.ndarray) -> float:
     completeness = n_indepen_refs / n_all_indepen_refs * 100
     return completeness
 
-def show_redundancy_V2(hkl:np.ndarray, all_hkl_orig: np.ndarray) -> float:
+
+def show_redundancy_V2(hkl: np.ndarray, all_hkl_orig: np.ndarray) -> float:
     n_hkl = hkl.shape[0]
     n_all_hkl_orig = all_hkl_orig.shape[0]
     redundancy = n_hkl / n_all_hkl_orig
     return redundancy
+
 
 def show_multiplicity_V2(hkl_origin: np.ndarray, all_hkl_orig: np.ndarray) -> float:
     n_hkl_origin = hkl_origin.shape[0]
     n_all_hkl_orig_unique = np.unique(all_hkl_orig, axis=0).shape[0]
     multiplicity = np.sum(n_hkl_origin) / n_all_hkl_orig_unique
     return multiplicity
+
 
 def calc_cell_volume(parameters: List[float]) -> float:
     cell_vol = parameters[0] * parameters[1] * parameters[2] * (1 - np.cos(np.deg2rad(parameters[3])) ** 2 - np.cos(
@@ -1688,10 +1690,13 @@ class CumulativeDataCalculator:
     d_spacings_all = None
     cell_parameters = None
 
-
     def set_d_roi(self, roi):
-        self.d_low = min(roi)
-        self.d_high = max(roi)
+        if roi is None:
+            self.d_low=None
+            self.d_high=None
+        else:
+            self.d_low = min(roi)
+            self.d_high = max(roi)
 
     def create_spacings_for_hkl_e(self, hkl_e):
         d_array = create_d_array(parameters=self.cell_parameters, hkl_array=decode_hkl(hkl_e))
@@ -1709,7 +1714,7 @@ class CumulativeDataCalculator:
             'ommited': False,
             'order': self.high_free_index,
             'angle_roi': None,
-            'd_spacings': create_d_array(parameters=self.cell_parameters,hkl_array=scandatacontainer.hkl).reshape(-1)
+            'd_spacings': create_d_array(parameters=self.cell_parameters, hkl_array=scandatacontainer.hkl).reshape(-1)
         }
 
         self.high_free_index += 1
@@ -1728,11 +1733,9 @@ class CumulativeDataCalculator:
             bool_mask = self.gen_bool_mask(run_data)
             hkl_original_ = run_data['hkl_origin_e'][bool_mask].reshape(-1)
             hkl_original_e_list.append(hkl_original_)
-        bool_mask =self.gen_d_roi_bool_mask(self.d_spacings_all)
+        bool_mask = self.gen_d_roi_bool_mask(self.d_spacings_all)
         all_origin_e = self.hkl_orig_all_e[bool_mask].reshape(-1)
-        return hkl_original_e_list,all_origin_e
-
-
+        return hkl_original_e_list, all_origin_e
 
     def change_ommit_by_index(self, index, flag):
         assert index in tuple(self.data_container.keys()), f'There is no data with {index} index!'
@@ -1755,35 +1758,34 @@ class CumulativeDataCalculator:
         self.hkl_orig_all_e = encode_hkl(hkl_orig_all)
         self.d_spacings_all = self.create_spacings_for_hkl_e(self.hkl_all_e)
 
-    def gen_d_roi_bool_mask(self,d_spacings):
+    def gen_d_roi_bool_mask(self, d_spacings):
         d_low_bool = d_spacings > self.d_low if self.d_low else True
         d_high_bool = d_spacings < self.d_high if self.d_high else True
         d_bool = d_low_bool & d_high_bool
         return d_bool
 
-    def gen_angle_roi_bool_mask(self,angle_roi, diff_angles):
+    def gen_angle_roi_bool_mask(self, angle_roi, diff_angles):
         if angle_roi:
             min_, max_, range_ = Sample.angle_range(start_rad=angle_roi[0],
                                                     end_rad=angle_roi[1])
 
             sweep_bool = Sample.angles_in_sweep(angles_array=diff_angles, start=min_, end=max_,
-                                                sweep_type=range_,return_bool=True).reshape(-1)
+                                                sweep_type=range_, return_bool=True).reshape(-1)
 
         else:
             sweep_bool = True
         return sweep_bool
 
-
     def gen_bool_mask(self, run_data):
         d_bool = self.gen_d_roi_bool_mask(run_data['d_spacings'])
-        sweep_bool = self.gen_angle_roi_bool_mask(angle_roi=run_data['angle_roi'],diff_angles=run_data['diff_angles'])
+        sweep_bool = self.gen_angle_roi_bool_mask(angle_roi=run_data['angle_roi'], diff_angles=run_data['diff_angles'])
         bool_ = d_bool & sweep_bool
         return bool_
 
-    def calc_cumulative_completeness(self, order_by_decrement=True,permutation_indices=None):
+    def calc_cumulative_completeness(self, order_by_decrement=True, permutation_indices=None):
         completeness_list = []
         if not order_by_decrement and permutation_indices:
-            runs_data = self.shuffle_dict_by_permutation(self.data_container,permutation_indices)
+            runs_data = self.shuffle_dict_by_permutation(self.data_container, permutation_indices)
         else:
             runs_data = self.data_container
         ommited_list = []
@@ -1849,7 +1851,7 @@ class CumulativeDataCalculator:
             hkl = hkl[bool_mask]
         if base_hkl is not None:
             hkl = np.append(hkl, base_hkl)
-        completeness = self.completeness(hkl_original=hkl, all_original_hkl=self.hkl_orig_all_e,cut_d=True)
+        completeness = self.completeness(hkl_original=hkl, all_original_hkl=self.hkl_orig_all_e, cut_d=True)
         return completeness
 
     def all_runs_bool_masks(self):
@@ -1860,8 +1862,7 @@ class CumulativeDataCalculator:
         all_origin_mask = self.gen_d_roi_bool_mask(self.d_spacings_all)
         return bool_masks, all_origin_mask
 
-
-    def completeness(self, hkl_original, all_original_hkl,cut_d=False):
+    def completeness(self, hkl_original, all_original_hkl, cut_d=False):
         if cut_d:
             bool_a_ = self.gen_d_roi_bool_mask(self.d_spacings_all)
             n_uniq_hkl = len(np.unique(hkl_original))
@@ -1876,7 +1877,7 @@ class CumulativeDataCalculator:
 
 
 class ScanDataContainer:
-    def __init__(self,diff_vecs, hkl, hkl_origin, diff_angles, scan_setup,start_angle, sweep):
+    def __init__(self, diff_vecs, hkl, hkl_origin, diff_angles, scan_setup, start_angle, sweep):
         self.diff_vecs = diff_vecs
         self.hkl = hkl
         self.hkl_origin = hkl_origin
@@ -1885,11 +1886,12 @@ class ScanDataContainer:
         self.start_angle = start_angle
         self.sweep = sweep
 
+
 class StrategyContainer:
     scan_data_containers = []
 
-    def add_scan_data_container(self,sdc):
-        assert isinstance(sdc,ScanDataContainer), 'Wrong scan data format!'
+    def add_scan_data_container(self, sdc):
+        assert isinstance(sdc, ScanDataContainer), 'Wrong scan data format!'
         self.scan_data_containers.append(sdc)
 
     def clear_data(self):
@@ -1901,10 +1903,8 @@ class StrategyContainer:
             hkl.append(scan.hkl)
         return hkl
 
-    def get_hkl_roi(self, d_low,d_high,diffraction_angles_roi):
+    def get_hkl_roi(self, d_low, d_high, diffraction_angles_roi):
         pass
-
-
 
     def get_hkl_origin(self):
         hkl_origin = []
@@ -1913,17 +1913,19 @@ class StrategyContainer:
         return hkl_origin
 
     def hasdata(self):
-        if self.scan_data_containers: return True
-        else: return False
+        if self.scan_data_containers:
+            return True
+        else:
+            return False
 
-def create_cumulative_fig(ordered_hkl_orig,run_indices,parameters,hkl_origin_in_d_range):
 
+def create_cumulative_fig(ordered_hkl_orig, run_indices, parameters, hkl_origin_in_d_range):
     comp_y, comp_x = [], []
     hkl_origin_ = np.array([]).reshape(-1, 3)
     for hkl_ in ordered_hkl_orig:
         hkl_origin_ = np.vstack((hkl_origin_, hkl_))
         comp_y_, comp_x_ = generate_completeness_plot(hkl_orig=hkl_origin_, all_hkl_orig=hkl_origin_in_d_range,
-                                                         parameters=parameters, step=.1)
+                                                      parameters=parameters, step=.1)
         comp_y.append(comp_y_)
         comp_x.append(comp_x_)
     fig = go.Figure()
@@ -1948,6 +1950,165 @@ def create_cumulative_fig(ordered_hkl_orig,run_indices,parameters,hkl_origin_in_
     fig.update_yaxes({'title': '%'})
     fig['layout']['xaxis']['autorange'] = "reversed"
     return fig
+
+
+def cumulative_dag_row_data_processing(dag_data):
+    if not dag_data:
+        return {
+            'run n': [],
+            'run_order': [],
+            'min': [],
+            'max': [],
+            'min_angles': [],
+            'max_angles': [],
+            'selected': [],
+        }
+
+    output_data = {
+        'run n': [],
+        'run_order': [],
+        'min': [],
+        'max': [],
+        'min_angles': [],
+        'max_angles': [],
+        'selected': [],
+    }
+
+    error_messages = []
+    has_errors = False
+
+    for run_data in dag_data:
+        for key in output_data:
+            if key not in ('selected','run n','run_order'):
+                output_data[key].append(float(run_data[key]))
+            else:
+                output_data[key].append(run_data[key])
+
+        if not run_data['selected']:
+            continue
+
+        run_n = run_data['run n']
+        min_val = run_data['min']
+        max_val = run_data['max']
+        min_lim = run_data['min_angles']
+        max_lim = run_data['max_angles']
+
+        if min_val is None or max_val is None or min_lim is None or max_lim is None:
+            continue
+
+        run_error_messages = []
+        if min_val < min_lim or min_val > max_lim:
+            run_error_messages.append(f"min value {min_val} is out of range [{min_lim}, {max_lim}]")
+        if max_val < min_lim or max_val > max_lim:
+            run_error_messages.append(f"max value {max_val} is out of range [{min_lim}, {max_lim}]")
+
+        if run_error_messages:
+            has_errors = True
+            error_messages.append(f"Run n {run_n}:\n" + "\n".join(run_error_messages))
+
+    if has_errors:
+        error_message = "Errors occurred:\n" + "\n".join(error_messages)
+        modal_tuple_ = MODAL_TUPLE(header='Angles out of range', body=error_message)
+        raise CalcCumulativeCompletenessError(modal_tuple_)
+
+    return output_data
+
+def generate_rowdata_cumulative_ag(exp_inst):
+    sweeps = []
+    start_angles = []
+    end_angles = []
+    run_n = []
+    editable_flag = True
+    for n, run in enumerate(exp_inst.strategy_data_container.scan_data_containers):
+        sweep = run.sweep
+        start_angle = run.start_angle
+        sweeps.append(sweep)
+        start_angles.append(start_angle)
+        if (sweep is not None) & (start_angle is not None):
+            end_angles.append(start_angle + sweep)
+        else:
+            end_angles.append(None)
+            editable_flag = False
+        run_n.append(n)
+    if editable_flag:
+        min_angles = [min(s, e) for s, e in zip(start_angles, end_angles)]
+        max_angles = [max(s, e) for s, e in zip(start_angles, end_angles)]
+    else:
+        min_angles = [None] * len(sweeps)
+        max_angles = [None] * len(sweeps)
+
+    df = pd.DataFrame({
+        'id': ['cumulative_data_row_' + str(i) for i in run_n],
+        'run n': run_n,
+        'min': min_angles,
+        'max': max_angles,
+        'selected': [True] * len(run_n),
+        'completeness': [None] * len(run_n),
+        'run_order': run_n,
+        'min_angles': min_angles,
+        'max_angles': max_angles,
+    })
+
+    df['tooltip'] = [
+        f"Angle range: from {a:.2f} to {b:.2f}"
+        for a, b in zip(df['min_angles'], df['max_angles'])
+    ]
+    return df.to_dict("records")
+
+
+def process_d_range(exp_inst,d_range):
+    low_workaround = 0.0
+    high_workaround = 9999.0
+
+    dmin = d_range[0]['d_min']
+    dmax = d_range[0]['d_max']
+    dmin = low_workaround if dmin in (None, '') else float(dmin)
+    dmax = high_workaround if dmax in (None, '') else float(dmax)
+    dmin, dmax = sorted([dmin, dmax])
+
+    if (dmin == low_workaround) and (dmax == high_workaround):
+        exp_inst.cdcc.set_d_roi(None)
+    else:
+        exp_inst.cdcc.set_d_roi((dmin, dmax))
+
+    return dmin, dmax
+
+
+def update_data_container(exp_inst,input_parameters, dag_length):
+    for i in range(dag_length):
+        run_n = input_parameters['run n'][i]
+
+        if not input_parameters['selected'][i]:
+            exp_inst.cdcc.data_container[run_n]['ommited'] = True
+            continue
+
+        exp_inst.cdcc.data_container[run_n]['ommited'] = False
+
+        min_val = input_parameters['min'][i]
+        max_val = input_parameters['max'][i]
+        min_angle = input_parameters['min_angles'][i]
+        max_angle = input_parameters['max_angles'][i]
+
+        if {min_val, max_val} == {min_angle, max_angle}:
+            exp_inst.cdcc.data_container[run_n]['angle_roi'] = None
+        else:
+            angle_roi = [
+                min(min_val, max_val),
+                max(min_val, max_val)
+            ]
+            exp_inst.cdcc.data_container[run_n]['angle_roi'] = [
+                np.deg2rad(angle) for angle in angle_roi
+            ]
+
+
+def update_completeness_data(dag_data, completeness):
+    for n, run in enumerate(dag_data):
+        run['completeness'] = completeness.get(n, None)
+    return dag_data
+
+
+
+
 
 if __name__ == '__main__':
     load_hklf4('Z4.hkl')

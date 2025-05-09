@@ -16,3 +16,11 @@ h1 {
     padding: 2rem 1rem;
     background-color: #5C5C5C;
 }
+
+.invalid-value {
+    background-color: rgba(255, 0, 0, 0.2) !important;
+}
+
+.ag-row.invalid-row {
+    background-color: rgba(255, 0, 0, 0.2) !important;
+}

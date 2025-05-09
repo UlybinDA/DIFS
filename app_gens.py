@@ -1,6 +1,7 @@
 from dash import dash_table, html
 from dash.dash_table.Format import Format, Scheme
 import pandas as pd
+import dash_ag_grid as dag
 
 
 def generate_choose_scan_dropdown(exp_inst, id_, style, style_cell):
@@ -17,7 +18,7 @@ def generate_choose_scan_dropdown(exp_inst, id_, style, style_cell):
         fill_width=False,
         dropdown={
             'x_axis': {
-                'options': [{'label': f'{name}', 'value': no } for
+                'options': [{'label': f'{name}', 'value': no} for
                             no, name in enumerate(exp_inst.axes_names) if real_axes[no] == 'true']}, },
         id=f'{id_}'
     ),
@@ -199,7 +200,7 @@ def gen_run_table(real_axes, axes_angles, rotations, names, table_num, data=None
 
     for no, rot in enumerate(rotations):
         if real_axes[no] == 'true':
-            dropdown_options_list += [{'label': f'{names[no]}', 'value': f'{no }'}, ]
+            dropdown_options_list += [{'label': f'{names[no]}', 'value': f'{no}'}, ]
     if data is None:
         dict_for_table = {
             f'{table_num}scan_no': '',
@@ -292,3 +293,307 @@ def gen_run_table(real_axes, axes_angles, rotations, names, table_num, data=None
         id={'type': 'runs_div', 'index': table_num}
     )
     return new_div_table
+
+
+def generate_empty_dag_for_cumulative_completeness(id_):
+    df = pd.DataFrame({
+        'id': [None],
+        'run n': [None],
+        'min': [None],
+        'max': [None],
+        'selected': [None],
+        'completeness': [None],
+        'run_order': [None],
+        'min_angles': [None],
+        'max_angles': [None],
+    })
+
+    df['tooltip'] = ['fill me in']
+
+    column_defs = [
+        {"field": "id", "hide": True},
+        {"field": "run n", "rowDrag": True},
+        {
+            "field": "min",
+            "headerName": "Min Angle",
+            "tooltipField": "tooltip",
+            "editable": {"function": "params.data.min_angles !== null"},
+            "cellClassRules": {
+                "invalid-value": "params.value < params.data.min_angles || params.value > params.data.max_angles"
+            },
+            "valueSetter": {
+                "function": """
+                        function(params) {
+                            const val = parseFloat(params.newValue);
+                            const minANG = params.data.min_angles;
+                            const maxANG = params.data.max_angles;
+                            if (isNaN(val) || val < minANG || val > maxANG) {
+                                return false;
+                            }
+                            params.data.min = val;
+                            return true;
+                        }
+                    """
+            }
+        },
+        {
+            "field": "max",
+            "headerName": "Max Angle",
+            "tooltipField": "tooltip",
+            "editable": {"function": "params.data.min_angles !== null"},
+            "cellClassRules": {
+                "invalid-value": "params.value < params.data.min_angles || params.value > params.data.max_angles"
+            },
+            "valueSetter": {
+                "function": """
+                        function(params) {
+                            const val = parseFloat(params.newValue);
+                            const minANG = params.data.min_angles;
+                            const maxANG = params.data.max_angles;
+                            if (isNaN(val) || val < minANG || val > maxANG) {
+                                return false;
+                            }
+                            params.data.max = val;
+                            return true;
+                        }
+                    """
+            }
+        },
+        {
+            "field": "selected",
+            "headerName": "Select",
+            "cellRenderer": "agCheckboxCellRenderer",
+            "cellEditor": "agCheckboxCellEditor",
+            "editable": True,
+            "width": 100,
+            "valueGetter": {"function": "params.data.selected || false"},
+            "valueSetter": {
+                "function": """
+                        function(params) {
+                            params.data.selected = params.newValue;
+                            return true;
+                        }
+                    """
+            }
+        },
+        {"field": "completeness", "headerName": "Completeness"},
+        {"field": "run_order", "hide": True},
+        {"field": "min_angles", "hide": True},
+        {"field": "max_angles", "hide": True},
+        {"field": "tooltip", "hide": True}
+    ]
+
+    grid_options = {
+        "rowDragManaged": True,
+        "animateRows": True,
+        "suppressMoveWhenRowDragging": False,
+        "immutableData": True,
+        "suppressMovableColumns": True,
+        "deltaRowDataMode": True,
+        "getRowNodeId": {"function": "params.data.id"},
+        "enableBrowserTooltips": True,
+        "tooltipShowDelay": 0,
+    }
+
+    dag_table = dag.AgGrid(
+        id="completeness_dag",
+        columnDefs=column_defs,
+        rowData=df.to_dict("records"),
+        dashGridOptions=grid_options,
+        defaultColDef={"sortable": False, "filter": False, "resizable": True},
+        persistence=False,
+        persistence_type='memory',
+        style={"height": "500px", "width": "50%"}
+    )
+
+    return dag_table
+
+
+def generate_dag_for_cumulative_completeness(exp_instance):
+    sweeps = []
+    start_angles = []
+    end_angles = []
+    run_n = []
+    editable_flag = True
+    for n, run in enumerate(exp_instance.strategy_data_container.scan_data_containers):
+        sweep = run.sweep
+        start_angle = run.start_angle
+        sweeps.append(sweep)
+        start_angles.append(start_angle)
+        if (sweep is not None) & (start_angle is not None):
+            end_angles.append(start_angle + sweep)
+        else:
+            end_angles.append(None)
+            editable_flag = False
+        run_n.append(n)
+    if editable_flag:
+        min_angles = [min(s, e) for s, e in zip(start_angles, end_angles)]
+        max_angles = [max(s, e) for s, e in zip(start_angles, end_angles)]
+    else:
+        min_angles = [None] * len(sweeps)
+        max_angles = [None] * len(sweeps)
+
+    df = pd.DataFrame({
+        'id': ['cumulative_data_row_' + str(i) for i in run_n],
+        'run n': run_n,
+        'min': min_angles,
+        'max': max_angles,
+        'selected': [True] * len(run_n),
+        'completeness': [None] * len(run_n),
+        'run_order': run_n,
+        'min_angles': min_angles,
+        'max_angles': max_angles,
+    })
+
+    df['tooltip'] = [
+        f"Angle range: from {a:.2f} to {b:.2f}"
+        for a, b in zip(df['min_angles'], df['max_angles'])
+    ]
+
+    column_defs = [
+        {"field": "id", "hide": True},
+        {"field": "run n", "rowDrag": True},
+        {
+            "field": "min",
+            "headerName": "Min Angle",
+            "tooltipField": "tooltip",
+            "editable": {"function": "params.data.min_angles !== null"},
+            "cellClassRules": {
+                "invalid-value": "params.value < params.data.min_angles || params.value > params.data.max_angles"
+            },
+            "valueSetter": {
+                "function": """
+                    function(params) {
+                        const val = parseFloat(params.newValue);
+                        const minANG = params.data.min_angles;
+                        const maxANG = params.data.max_angles;
+                        if (isNaN(val) || val < minANG || val > maxANG) {
+                            return false;
+                        }
+                        params.data.min = val;
+                        return true;
+                    }
+                """
+            }
+        },
+        {
+            "field": "max",
+            "headerName": "Max Angle",
+            "tooltipField": "tooltip",
+            "editable": {"function": "params.data.min_angles !== null"},
+            "cellClassRules": {
+                "invalid-value": "params.value < params.data.min_angles || params.value > params.data.max_angles"
+            },
+            "valueSetter": {
+                "function": """
+                    function(params) {
+                        const val = parseFloat(params.newValue);
+                        const minANG = params.data.min_angles;
+                        const maxANG = params.data.max_angles;
+                        if (isNaN(val) || val < minANG || val > maxANG) {
+                            return false;
+                        }
+                        params.data.max = val;
+                        return true;
+                    }
+                """
+            }
+        },
+        {
+            "field": "selected",
+            "headerName": "Select",
+            "cellRenderer": "agCheckboxCellRenderer",
+            "cellEditor": "agCheckboxCellEditor",
+            "editable": True,
+            "width": 100,
+            "valueGetter": {"function": "params.data.selected || false"},
+            "valueSetter": {
+                "function": """
+                    function(params) {
+                        params.data.selected = params.newValue;
+                        return true;
+                    }
+                """
+            }
+        },
+        {"field": "completeness", "headerName": "Completeness"},
+        {"field": "run_order", "hide": True},
+        {"field": "min_angles", "hide": True},
+        {"field": "max_angles", "hide": True},
+        {"field": "tooltip", "hide": True}
+    ]
+
+    grid_options = {
+        "rowDragManaged": True,
+        "animateRows": True,
+        "suppressMoveWhenRowDragging": False,
+        "immutableData": True,
+        "suppressMovableColumns": True,
+        "deltaRowDataMode": True,
+        "getRowNodeId": {"function": "params.data.id"},
+        "enableBrowserTooltips": True,
+        "tooltipShowDelay": 0,
+    }
+
+    dag_table = dag.AgGrid(
+        id="completeness_dag",
+        columnDefs=column_defs,
+        rowData=df.to_dict("records"),
+        dashGridOptions=grid_options,
+        defaultColDef={"sortable": False, "filter": False, "resizable": True},
+        persistence=False,
+        persistence_type='memory',
+        style={"height": "500px", "width": "50%"}
+    )
+
+    return dag_table
+
+
+def get_range_dag(id_):
+    return html.Div(
+        dag.AgGrid(
+            id=id_,
+            columnDefs=[
+                {
+                    "field": "d_min",
+                    "headerName": "Min",
+                    "editable": True,
+                    "width": 70,
+                    "valueParser": {
+                        "function": """
+                                function(params) {
+                                    const value = parseFloat(params.newValue);
+                                    return isNaN(value) ? null : value;
+                                }
+                            """
+                    },
+                    "cellEditor": "agTextCellEditor",
+                },
+                {
+                    "field": "d_max",
+                    "headerName": "Max",
+                    "editable": True,
+                    "width": 70,
+                    "valueParser": {
+                        "function": """
+                                function(params) {
+                                    const value = parseFloat(params.newValue);
+                                    return isNaN(value) ? null : value;
+                                }
+                            """
+                    },
+                    "cellEditor": "agTextCellEditor",
+                },
+            ],
+            rowData=[{"d_min": None, "d_max": None}],
+            rowClassRules={
+                "invalid-row": "(params.data.d_min !== null && params.data.d_max !== null && params.data.d_min > params.data.d_max && params.data.d_min !== undefined && params.data.d_max !== undefined) || params.data.d_min < 0 || params.data.d_max < 0"
+            },
+            style={
+                "height": "90px",
+                "width": "160px",
+                "fontSize": "10px",
+            },
+        ),
+        style={"display": "inline-block", "padding": "2px"},
+    )

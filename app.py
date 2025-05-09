@@ -5,7 +5,6 @@ from dash import no_update as no_upd
 from dash.dash_table.Format import Format, Scheme, Sign, Symbol
 import pandas as pd
 import dash
-import copy
 from os import listdir
 import service_functions as sf
 from Modals_content import *
@@ -18,6 +17,8 @@ import app_gens as apg
 import json
 from my_logger import mylogger
 import os
+import dash_ag_grid as dag
+import copy
 
 css_path = os.path.join(os.path.dirname(__file__), 'assets', 'style_main.css')
 goniometer_models_path = os.path.join(os.path.dirname(__file__), 'instruments', 'goniometers')
@@ -677,7 +678,7 @@ second_page = html.Div([
                                      'width': '30px'
                                  }, )]
         ),
-        html.Button('Set anvil', id='set_anvil_btn',n_clicks=0),
+        html.Button('Set anvil', id='set_anvil_btn', n_clicks=0),
         dcc.Checklist(['factor anvil'], id='calc_anvil_check'),
     ],
         style={
@@ -967,6 +968,31 @@ fourth_page = html.Div([
         ),
         html.Div([
             html.H6('Cumulative completeness'),
+            html.Div(
+                children=dcc.Graph(id='cumulative_plot_graph')
+                ,
+                id='cumulative_plot_container'
+            ),
+            html.Button('Update', id='update_cumulative_data_btn', n_clicks=0),
+            html.Div([
+                html.Div(apg.generate_empty_dag_for_cumulative_completeness(id_='completeness_dag'),
+                         ),
+
+            ],
+                id='div_ag_container'
+            ),
+
+            html.Div(
+
+                [html.Button('Sort and calc', id='calc_cumulative_reorder_comp_plot_btn', n_clicks=0),
+                 html.Button('Calc', id='calc_cumulative_ordered_comp_plot_btn', n_clicks=0),
+                 html.Div([
+                     html.H4('Calc d range, Å, '),
+                     apg.get_range_dag(id_='cumulative_range')
+                 ]
+                     , id='div_ag_parameters_container'),
+                 ]
+            ),
 
         ])
     ],
@@ -1019,7 +1045,6 @@ fourth_page = html.Div([
                   html.Button('map for selected', id='map_selected_button', n_clicks=0), ]
                  , style={'display': 'inline-block', }),
 
-
         html.Div([dcc.Graph(id='diffraction_map_graph', style={
             'width': '1000px',
             'height': '1000px'},
@@ -1067,9 +1092,9 @@ app.layout = html.Div([dcc.Location(id="url"),
                        dcc.Store(data=None, id='stored_rectangle_parameters', storage_type='memory'),
                        dcc.Store(data=None, id='stored_obstacles_div', storage_type='memory'),
                        dcc.Store(data=0, id='stored_obstacle_num', storage_type='session'),
-                       dcc.Store(data=None,id='stored_anvil_normal_data',storage_type='memory'),
-                       dcc.Store(data=None,id='stored_anvil_aperture_data',storage_type='memory'),
-                       dcc.Store(data=None,id='stored_anvil_calc_check',storage_type='memory'),
+                       dcc.Store(data=None, id='stored_anvil_normal_data', storage_type='memory'),
+                       dcc.Store(data=None, id='stored_anvil_aperture_data', storage_type='memory'),
+                       dcc.Store(data=None, id='stored_anvil_calc_check', storage_type='memory'),
                        # page-2 runs page
                        dcc.Store(data=False, id='page-2_stored_flag', storage_type='memory'),
                        dcc.Store(data=None, id='stored_runs_div', storage_type='memory'),
@@ -1086,6 +1111,8 @@ app.layout = html.Div([dcc.Location(id="url"),
                        dcc.Store(data=None, id='stored_rec_space', storage_type='memory'),
                        dcc.Store(data=None, id='stored_diffraction_map', storage_type='memory'),
                        dcc.Store(data=None, id='stored_section_vals', storage_type='memory'),
+                       dcc.Store(data=None, id='stored_cumulative_dag_data', storage_type='memory'),
+                       dcc.Store(data=None, id='stored_cumulative_plot', storage_type='memory'),
                        ])
 
 
@@ -1185,7 +1212,7 @@ def get_stored_home_page_data(flag, UB_table, parameters_table):
 @mylogger(level='DEBUG')
 def get_stored_page_1_data(flag, wavelength_val, goniometer_table, goniometer_dropdown, detector_dropdown,
                            detector_check_complex, circle_parameters, rectangle_parameters, obstacle_div,
-                           log_col_check,anvil_normal,anvil_aperture,anvil_check):
+                           log_col_check, anvil_normal, anvil_aperture, anvil_check):
     if not flag:
         raise dash.exceptions.PreventUpdate()
     storage_data_list = [wavelength_val,
@@ -1228,6 +1255,8 @@ def get_stored_page_2_data(flag, runs):
     Output('multiplicity_graph', 'figure', allow_duplicate=True),
     Output('redundancy_graph', 'figure', allow_duplicate=True),
     Output('rec_space_viewer_graph', 'figure', allow_duplicate=True),
+    Output('completeness_dag','rowData'),
+    Output('cumulative_plot_graph', 'figure'),
     Output("page-3_stored_flag", "data", allow_duplicate=True),
     Input("page-3_stored_flag", "data"),
     State('stored_centring_dropdown', 'data'),
@@ -1238,11 +1267,13 @@ def get_stored_page_2_data(flag, runs):
     State('stored_multiplicity_plot', 'data'),
     State('stored_redundancy_plot', 'data'),
     State('stored_rec_space', 'data'),
+    State('stored_cumulative_dag_data', 'data'),
+    State('stored_cumulative_plot', 'data'),
     prevent_initial_call=True)
-def get_stored_page_3_data(flag, centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space):
+def get_stored_page_3_data(flag, centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space,dag_cum,cum_plot):
     if not flag:
         raise dash.exceptions.PreventUpdate()
-    storage_data_list = [centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space]
+    storage_data_list = [centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space,dag_cum,cum_plot]
     output_list = [if_val_None_return_no_upd_else_return(val) for val in storage_data_list]
     output_list += [False, ]
     return output_list
@@ -1802,31 +1833,32 @@ def apply_goniometer(dicts_list, return_dict=True):
 
 
 @callback(
-    Output('stored_anvil_normal_data','data'),
-    Output('stored_anvil_aperture_data','data'),
+    Output('stored_anvil_normal_data', 'data'),
+    Output('stored_anvil_aperture_data', 'data'),
     Output('hidden_div_2', 'children', allow_duplicate=True),
-    Input('set_anvil_btn','n_clicks'),
-    State('anvil_normal_vector_table','data'),
-    State('anvil_aperture_input','value'),
+    Input('set_anvil_btn', 'n_clicks'),
+    State('anvil_normal_vector_table', 'data'),
+    State('anvil_aperture_input', 'value'),
     prevent_initial_call=True
 )
-@mylogger(level='DEBUG',log_args=True)
-def set_anvil(n_clicks,normal_data,aperture_data):
+@mylogger(level='DEBUG', log_args=True)
+def set_anvil(n_clicks, normal_data, aperture_data):
     if n_clicks == 0:
         raise dash.exceptions.PreventUpdate()
     normal = sf.procces_anvil_normal_data(normal_data)
     try:
-        exp1.set_diamond_anvil(aperture=aperture_data,anvil_normal=normal)
+        exp1.set_diamond_anvil(aperture=aperture_data, anvil_normal=normal)
     except DiamondAnvilError as e:
         return no_upd, no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
     return normal_data, aperture_data, no_upd
+
 
 @callback(
     Output('stored_anvil_calc_check', 'data'),
     Input('calc_anvil_check', 'value'),
     prevent_initial_call=True
 )
-@mylogger(level='DEBUG',log_args=True)
+@mylogger(level='DEBUG', log_args=True)
 def check_anvil(check):
     if check is None or check == list():
         exp1.calc_anvil_flag = False
@@ -2999,6 +3031,7 @@ def generate_angle_table(id_, style, style_cell):
     State('diff_map_workaround_P', 'children'),
     State('map_input_container', 'children'),
     State('diffraction_map_graph', 'figure'),
+    prevent_initial_call=True
 )
 @mylogger(level='DEBUG')
 def calc_1d_section(relayoutdata, map_type, data_container, fig):
@@ -3042,5 +3075,107 @@ def calc_1d_section(relayoutdata, map_type, data_container, fig):
     return all_str, uniq_str, uniq_orig_str
 
 
+@callback(
+    Output('completeness_dag', 'rowData', allow_duplicate=True),
+    Output('stored_cumulative_dag_data', 'data'),
+    Output('hidden_div_4', 'children'),
+    Input('update_cumulative_data_btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def update_cumulative_data(n_clicks):
+    if n_clicks == 0:
+        raise dash.exceptions.PreventUpdate()
+    try:
+        exp1.refresh_cdcc()
+    except CDCCError as e:
+        return no_upd, no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
+    rowdata = sf.generate_rowdata_cumulative_ag(exp1)
+    return rowdata, rowdata, no_upd
+
+
+@callback(
+    Output("completeness_dag", "rowData", allow_duplicate=True),
+    Input("completeness_dag", "virtualRowData"),
+    State("completeness_dag", "rowData"),
+    prevent_initial_call=True
+)
+def update_row_order(virtual_data, current_data):
+    if not virtual_data or not current_data:
+        return no_upd
+
+    order_mapping = {row['id']: row for row in current_data}
+
+    updated_data = []
+    for i, virt_row in enumerate(virtual_data):
+        original_row = order_mapping.get(virt_row['id'])
+        if original_row:
+            new_row = {
+                **original_row,
+                "order": i  # Только обновляем порядок
+            }
+            updated_data.append(new_row)
+    return updated_data
+
+
+@callback(
+    Output('cumulative_plot_graph', 'figure', allow_duplicate=True),
+    Output('stored_cumulative_plot', 'data', allow_duplicate=True),
+    Output("completeness_dag", "rowData", allow_duplicate=True),
+    Output("stored_cumulative_dag_data", "data", allow_duplicate=True),
+    Output('hidden_div_4', 'children', allow_duplicate=True),
+    Input("calc_cumulative_reorder_comp_plot_btn", "n_clicks"),
+    State("completeness_dag", "rowData"),
+    State("cumulative_range", "rowData"),
+    prevent_initial_call=True
+)
+def sort_run_calc_comp_plots(n_clicks, dag_data, d_range):
+    if n_clicks == 0 or not dag_data:
+        raise dash.exceptions.PreventUpdate()
+
+    try:
+        input_params = sf.cumulative_dag_row_data_processing(dag_data)
+    except CalcCumulativeCompletenessError as e:
+        return no_upd,no_upd,no_upd,no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
+
+    sf.process_d_range(exp1,d_range)
+    sf.update_data_container(exp1,input_params, len(dag_data))
+
+    fig, completeness = exp1.generate_1d_comp_cumulative_plot(order=True)
+    updated_dag = sf.update_completeness_data(dag_data, completeness)
+
+    return fig, fig, updated_dag, updated_dag, no_upd
+
+
+@callback(
+    Output('cumulative_plot_graph', 'figure', allow_duplicate=True),
+    Output('stored_cumulative_plot', 'data', allow_duplicate=True),
+    Output("completeness_dag", "rowData", allow_duplicate=True),
+    Output("stored_cumulative_dag_data", "data", allow_duplicate=True),
+    Output('hidden_div_4', 'children', allow_duplicate=True),
+    Input("calc_cumulative_ordered_comp_plot_btn", "n_clicks"),
+    State("completeness_dag", "rowData"),
+    State("cumulative_range", "rowData"),
+    prevent_initial_call=True
+)
+def run_calc_comp_plots(n_clicks, dag_data, d_range):
+    if n_clicks == 0 or not dag_data:
+        raise dash.exceptions.PreventUpdate()
+
+    try:
+        input_params = sf.cumulative_dag_row_data_processing(dag_data)
+    except CalcCumulativeCompletenessError as e:
+        return no_upd,no_upd,no_upd,no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
+
+    sf.process_d_range(exp1,d_range)
+    sf.update_data_container(exp1,input_params, len(dag_data))
+    print(input_params['run_order'])
+    fig, completeness = exp1.generate_1d_comp_cumulative_plot(
+        order=False,
+        permutation_indices=input_params['run_order']
+    )
+    updated_dag = sf.update_completeness_data(dag_data, completeness)
+
+    return fig, fig, updated_dag, updated_dag, dash.no_update
+
 if __name__ == '__main__':
-    app.run(debug=True,)
+    app.run(debug=True, )

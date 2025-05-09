@@ -34,3 +34,8 @@ class CDCCError(Exception):
     def __init__(self,modal):
         self.error_modal_content = modal
         print(modal.body)
+        
+class CalcCumulativeCompletenessError(Exception):
+    def __init__(self,modal):
+        self.error_modal_content = modal
+        print(modal.body)

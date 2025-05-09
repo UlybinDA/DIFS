@@ -183,7 +183,6 @@ class Experiment:
                                                                                        return_origin=True,
                                                                                        pg=self.pg,
                                                                                        centring=self.centring)
-            print(f'n of independent {len(np.unique(self.hkl_origin_in_d_range, axis=0))}')
 
             if self.diamond_anvil and self.calc_anvil_flag:
                 self.hkl_in_d_range, self.hkl_origin_in_d_range = \
@@ -191,7 +190,6 @@ class Experiment:
                                                                 data=(self.hkl_in_d_range, self.hkl_origin_in_d_range),
                                                                 wavelength=self.wavelength, separate_back=False)[
                         'all_windows']
-            print(f'n of independent in bublic {len(np.unique(self.hkl_origin_in_d_range, axis=0))}')
             self.centring_previous = self.centring
             self.pg_previous = self.pg
             self.d_range = d_range
@@ -276,7 +274,6 @@ class Experiment:
 
     def load_hkls(self, hkl_str_list, pg=None, centring=None):
         self.strategy_data_container.clear_data()
-        data = list()
         if pg is None: pg = self.pg
         if centring is None: centring = self.centring
         d_min, d_max = (None, None)
@@ -287,6 +284,7 @@ class Experiment:
             d_max_ = max(d_array)
             hkl_array_orig = sf.generate_original_hkl_for_hkl_array(hkl_array, pg=pg, parameters=self.parameters,
                                                                     centring=centring)
+
             sdc = sf.ScanDataContainer(diff_vecs=None, hkl=hkl_array, hkl_origin=hkl_array_orig, diff_angles=None,
                                        scan_setup=None, start_angle=None, sweep=None)
             self.strategy_data_container.add_scan_data_container(sdc)
@@ -434,7 +432,7 @@ class Experiment:
         ordered_list = [hkl_origin_list[i][run_bool_masks[i][:,0]] if run_bool_masks[i] is not True else hkl_origin_list[i] for i in run_indices]
         hkl_origin_in_d_range = self.hkl_origin_in_d_range[all_hkl_origin_mask[:,0]] if all_hkl_origin_mask is not True else self.hkl_origin_in_d_range
         fig = sf.create_cumulative_fig(ordered_list,run_indices,self.cell.parameters,hkl_origin_in_d_range)
-        return fig
+        return fig, {key:val for val, key in zip(completeness_list,run_indices)}
 
 
 

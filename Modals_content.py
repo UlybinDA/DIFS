@@ -145,3 +145,7 @@ anvil_normal_not_defined = MODAL_TUPLE(header='Diamond anvil error',
 
 CDCC_no_data_error = MODAL_TUPLE(header='CDCC error',
                                          body='No diffraction data to analyze')
+
+DAG_cumulative_cal_angle_error = MODAL_TUPLE(header='Angles out of range',
+                                         body='')
+
