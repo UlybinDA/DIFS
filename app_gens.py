@@ -376,7 +376,7 @@ def generate_empty_dag_for_cumulative_completeness(id_):
                     """
             }
         },
-        {"field": "completeness", "headerName": "Completeness"},
+        {"field": "completeness", "headerName": "Completeness","sortable": True},
         {"field": "run_order", "hide": True},
         {"field": "min_angles", "hide": True},
         {"field": "max_angles", "hide": True},
@@ -540,7 +540,7 @@ def generate_dag_for_cumulative_completeness(exp_instance):
         columnDefs=column_defs,
         rowData=df.to_dict("records"),
         dashGridOptions=grid_options,
-        defaultColDef={"sortable": False, "filter": False, "resizable": True},
+        defaultColDef={"sortable": True, "filter": False, "resizable": True},
         persistence=False,
         persistence_type='memory',
         style={"height": "500px", "width": "50%"}

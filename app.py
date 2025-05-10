@@ -3168,7 +3168,6 @@ def run_calc_comp_plots(n_clicks, dag_data, d_range):
 
     sf.process_d_range(exp1,d_range)
     sf.update_data_container(exp1,input_params, len(dag_data))
-    print(input_params['run_order'])
     fig, completeness = exp1.generate_1d_comp_cumulative_plot(
         order=False,
         permutation_indices=input_params['run_order']

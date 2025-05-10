@@ -1810,7 +1810,6 @@ class CumulativeDataCalculator:
             hkl_original_base = np.append(hkl_original_base, hkl_add)
         for index in dynamic_ommition:
             runs_data[index]['ommited'] = False
-
         return completeness_list, runs_order
 
     def calc_highest_comp_increment(self, hkl_original_base, runs_data):
@@ -1838,12 +1837,9 @@ class CumulativeDataCalculator:
                 return completeness, index, hkl_original
 
     def shuffle_dict_by_permutation(self, original_dict, permutation):
-        keys = list(original_dict.keys())
-        values = list(original_dict.values())
-        shuffled_dict = {}
-        for i, key in enumerate(keys):
-            shuffled_dict[key] = values[permutation[i]]
-        return shuffled_dict
+        items = list(original_dict.items())
+        shuffled_items = [items[i] for i in permutation]
+        return dict(shuffled_items)
 
     def calc_completeness(self, hkl, bool_mask=None, base_hkl=None):
         assert self.hkl_orig_all_e.any(), 'to sort by comp, first add hkl origin super group'
