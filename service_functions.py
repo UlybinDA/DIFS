@@ -1984,10 +1984,10 @@ def cumulative_dag_row_data_processing(dag_data):
             continue
 
         run_n = run_data['run n']
-        min_val = run_data['min']
-        max_val = run_data['max']
-        min_lim = run_data['min_angles']
-        max_lim = run_data['max_angles']
+        min_val = float(run_data['min'])
+        max_val = float(run_data['max'])
+        min_lim = float(run_data['min_angles'])
+        max_lim = float(run_data['max_angles'])
 
         if min_val is None or max_val is None or min_lim is None or max_lim is None:
             continue

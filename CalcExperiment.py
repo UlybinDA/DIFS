@@ -362,48 +362,6 @@ class Experiment:
     def del_logic_collision(self):
         self.logic_collision = None
 
-    @mylogger(log_args=True)
-    def run_collision_check(self, scan=None):  # logic collision check
-        '''
-        Logic collision takes self.logic_collision which is list of sublists 'blocks' every block's element is also list
-        'subblock' which elements - mathematical expression.
-        During the check every element of subblock is evaluated. it is not necessary that all elements of each subblock
-        are true. Block check stops at first True subblockflag setting blockflag True. To pass check every blockflag must get flag True.
-        '''
-        scans = self.scans if scan is None else scan
-        conditions_not_met = list()
-        global_flag = True
-        for scan_n, scan in enumerate(scans):
-            scan_name = self.axes_names[int(scan[4])]
-            additional_operations = {'abs': abs}
-            angles_dict = dict(zip(self.axes_names, scan[3]))
-            variables_dict = {'d_dist': scan[0], 'det_ang_x': scan[1][0], 'det_ang_y': scan[1][1],
-                              'det_ang_z': scan[1][2], 'det_orient': scan[2],
-                              'scan_ax': scan_name, 'sweep': scan[5], 'det_d_y': scan[6], 'det_d_z': scan[7]}
-            variables_dict = {**variables_dict, **angles_dict, **additional_operations}
-
-            for n_block, block in enumerate(self.logic_collision):
-                block_flag = True
-                for subblock in block:
-                    subblock_flag = True
-                    for element in subblock:
-                        element_flag = sf.logic_eval(element, variables_dict)
-                        if not element_flag:
-                            subblock_flag = False
-                            break
-                    if subblock_flag:
-                        block_flag = True
-                        break
-                    block_flag = False
-                if not block_flag:
-                    conditions_not_met += [[scan_n, block]]
-                    global_flag = False
-        if not global_flag:
-            report_body_add = self.create_report(conditions_not_met)
-            report = MODAL_TUPLE(header=calc_collision_error.header,
-                                 body=''.join((calc_collision_error.body, *report_body_add)))
-            raise CollisionError(report)
-
     def _get_filtered_hkl_origin(self, runs='all'):
         hkl_origin_list = self.strategy_data_container.get_hkl_origin()
         if runs != 'all':

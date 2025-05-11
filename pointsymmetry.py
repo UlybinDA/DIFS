@@ -842,7 +842,6 @@ def generate_hkl_by_pg(hkl_orig_array,pg_key):
     indices = indices.reshape(-1,1)
     original_hkl = np.tile(hkl_orig_array.reshape(-1, 3), (num_of_gen_pos + 1, 1))[indices[:,0]]
     hkl_array = hkl_array[indices[:,0]]
-
     return hkl_array, original_hkl, hkl_orig_array
 
 def multiply_hkl_by_pg(hkl_orig_hkl,pg):
