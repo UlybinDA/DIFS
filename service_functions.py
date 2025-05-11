@@ -52,7 +52,7 @@ def gen_hkl_arrays(hmax: int, kmax: int, lmax: int, pg: Optional[str] = None, ce
     np.ndarray, np.ndarray]:
     pg_key = PG_KEYS[pg]
     original_hkl = generate_orig_hkl_array(h=hmax, k=kmax, l=lmax, pg=pg_key, centring=centring)
-    hkl_array, original_hkl, orig_hkl = generate_hkl_by_pg(hkl_orig_array=original_hkl, pg_key=pg)
+    hkl_array, original_hkl = generate_hkl_by_pg(hkl_orig_array=original_hkl, pg_key=pg)
     return hkl_array, original_hkl
 
 
@@ -324,7 +324,7 @@ def visualize_scans_space(scans: List[Tuple[np.ndarray, ...]], pg: str, all_hkl:
         pass
     n = -1
     if restore_hkl_by_pg:
-        all_hkl, all_hkl_orig, _ = generate_hkl_by_pg(hkl_orig_array=all_hkl_orig, pg_key=PG_KEYS[pg])
+        all_hkl, all_hkl_orig = generate_hkl_by_pg(hkl_orig_array=all_hkl_orig, pg_key=PG_KEYS[pg])
 
     if not origin_hkl:
         for scan in zip(*scans):

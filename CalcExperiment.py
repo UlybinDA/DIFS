@@ -305,6 +305,10 @@ class Experiment:
         unique1 = [data[boolarr1[:, 0]] if not (data is None) else None for data in [hkl1, hkl1_original]]
         return unique1
 
+    def generate_diffraction_map_3d(self, reflections, rotations, directions, angles_, rotation_directions, steps,
+                                    ranges, wavelength, names):
+        pass
+
     def separate_unique_common(self):
         assert len(self.strategy_data_container.scan_data_containers) >= 2, 'Provide at least 2 scan'
         # TODO make appropriate error handling
@@ -331,7 +335,7 @@ class Experiment:
         old_data_hkl = [self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()]
         old_data_hkl_ = []
         for i, j in zip(*old_data_hkl):
-            old_data_hkl_.append((i,j))
+            old_data_hkl_.append((i, j))
         old_data_hkl = old_data_hkl_
 
         self.strategy_data_container.clear_data()
@@ -348,7 +352,7 @@ class Experiment:
                                             hkl_origin=hkl_origin_intersec, scan_setup=None, start_angle=None,
                                             sweep=None)
         self.strategy_data_container.add_scan_data_container(sdc_intersec)
-        for i,j in zip(self.strategy_data_container.get_hkl(),self.strategy_data_container.get_hkl_origin()):
+        for i, j in zip(self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()):
             print(f'hkl shape: {i.shape} hkl_o shape{j.shape}')
 
     def set_logic_collision(self, collision_list):
@@ -381,18 +385,20 @@ class Experiment:
         hkl_origin = self._get_filtered_hkl_origin(runs)
         return sf.show_multiplicity_V2(hkl_origin, self.hkl_origin_in_d_range)
 
-    def generate_1d_comp_cumulative_plot(self,order=True,permutation_indices=None):
-        completeness_list, run_indices = self.cdcc.calc_cumulative_completeness(order,permutation_indices)
-        run_bool_masks,all_hkl_origin_mask = self.cdcc.all_runs_bool_masks()
-        run_bool_masks = [i.reshape(-1,1) if i is not True else i for i in run_bool_masks]
-        all_hkl_origin_mask = all_hkl_origin_mask.reshape(-1,1) if all_hkl_origin_mask is not True else all_hkl_origin_mask
+    def generate_1d_comp_cumulative_plot(self, order=True, permutation_indices=None):
+        completeness_list, run_indices = self.cdcc.calc_cumulative_completeness(order, permutation_indices)
+        run_bool_masks, all_hkl_origin_mask = self.cdcc.all_runs_bool_masks()
+        run_bool_masks = [i.reshape(-1, 1) if i is not True else i for i in run_bool_masks]
+        all_hkl_origin_mask = all_hkl_origin_mask.reshape(-1,
+                                                          1) if all_hkl_origin_mask is not True else all_hkl_origin_mask
         hkl_origin_list = self.strategy_data_container.get_hkl_origin()
-        ordered_list = [hkl_origin_list[i][run_bool_masks[i][:,0]] if run_bool_masks[i] is not True else hkl_origin_list[i] for i in run_indices]
-        hkl_origin_in_d_range = self.hkl_origin_in_d_range[all_hkl_origin_mask[:,0]] if all_hkl_origin_mask is not True else self.hkl_origin_in_d_range
-        fig = sf.create_cumulative_fig(ordered_list,run_indices,self.cell.parameters,hkl_origin_in_d_range)
-        return fig, {key:val for val, key in zip(completeness_list,run_indices)}
-
-
+        ordered_list = [
+            hkl_origin_list[i][run_bool_masks[i][:, 0]] if run_bool_masks[i] is not True else hkl_origin_list[i] for i
+            in run_indices]
+        hkl_origin_in_d_range = self.hkl_origin_in_d_range[
+            all_hkl_origin_mask[:, 0]] if all_hkl_origin_mask is not True else self.hkl_origin_in_d_range
+        fig = sf.create_cumulative_fig(ordered_list, run_indices, self.cell.parameters, hkl_origin_in_d_range)
+        return fig, {key: val for val, key in zip(completeness_list, run_indices)}
 
     def generate_1d_result_plot(self, runs='all', completeness=True, redundancy=True, multiplicity=True):
         hkl_origin_list = self.strategy_data_container.get_hkl_origin()
@@ -714,13 +720,13 @@ if __name__ == '__main__':
         # [0, 0, 60, -90],
         # [0, 0, 80, -90],
     ]
-    sweeps = [50,100,150]
+    sweeps = [50, 100, 150]
     rotation_dirs = (-1, -1, 1)
     # aperture = 40
     # anvil_normal = np.array([1., 0., 0.])
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
-    for angle,sweep in zip(angles,sweeps):
+    for angle, sweep in zip(angles, sweeps):
         exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=angle, scan=2,
                       sweep=sweep, )
 
@@ -731,9 +737,9 @@ if __name__ == '__main__':
     angle1 = np.deg2rad(0)
     angle2 = np.deg2rad(10)
     # exp2.cdcc.data_container[2]['angle_roi']=(angle1,angle2)
-    exp2.cdcc.set_d_roi((50,4))
+    exp2.cdcc.set_d_roi((50, 4))
     # exp2.cdcc.data_container[1]['ommited']=True
-    fig2 = exp2.generate_1d_comp_cumulative_plot(order=True,permutation_indices=(2,0,1))
+    fig2 = exp2.generate_1d_comp_cumulative_plot(order=True, permutation_indices=(2, 0, 1))
     fig2.show()
     # data = exp2.scan_data
     # scan_inputs = exp2.scans

@@ -848,8 +848,8 @@ class Sample():
 
             elif no_of_scan != 0 and no_of_scan + 1 != num_of_rots:
                 matr1 = R.from_matrix([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-                rotations1 = rotations[no_of_scan+1:][::-1]
-                angle1 = angle[no_of_scan+1:][::-1]
+                rotations1 = rotations[no_of_scan + 1:][::-1]
+                angle1 = angle[no_of_scan + 1:][::-1]
                 for i in range(len(rotations1)):
                     matr1 = matr1 * R.from_euler(rotations1[i], angle1[i])
 
@@ -984,14 +984,15 @@ class Sample():
                 hkl_array[:, 2] * hkl_array[:, 1] * a ** 2 * b * c * (np.cos(gm) * np.cos(bt) - np.cos(al)) + 2 *
                 hkl_array[:, 0] * hkl_array[:, 2] * a * b ** 2 * c * (np.cos(al) * np.cos(gm) - np.cos(bt))) ** 0.5
         return d_array
+
     @staticmethod
     def angle_range(
-                    scan_sweep: float = 0,
-                    start_angle: float = 0,
-                    epsilon: float = 1e-12,
-                    start_rad:Union[None,float] = None,
-                    end_rad:Union[None,float] = None
-                    ) -> Tuple[float, float, str]:
+            scan_sweep: float = 0,
+            start_angle: float = 0,
+            epsilon: float = 1e-12,
+            start_rad: Union[None, float] = None,
+            end_rad: Union[None, float] = None
+    ) -> Tuple[float, float, str]:
         if not start_rad and not end_rad:
             start_rad = np.deg2rad(start_angle) % (2 * np.pi)
             sweep_rad = np.deg2rad(scan_sweep)
@@ -1007,11 +1008,11 @@ class Sample():
 
     @staticmethod
     def angles_in_sweep(
-                        angles_array: np.ndarray,
-                        start: float,
-                        end: float,
-                        sweep_type: str = 'in',
-                        return_bool: bool = False) -> np.ndarray:
+            angles_array: np.ndarray,
+            start: float,
+            end: float,
+            sweep_type: str = 'in',
+            return_bool: bool = False) -> np.ndarray:
         angles = angles_array.copy()
 
         if end - start >= 2 * np.pi:
@@ -1085,7 +1086,7 @@ class Sample():
             d_array = d_array[d_array > d_range[0]].reshape(-1, 1)
             hkl_orig_array = hkl_orig_array[d_array[:, 0] < d_range[1]]
 
-            hkl_array, original_hkl, hkl_orig = generate_hkl_by_pg(hkl_orig_array, pg_key)
+            hkl_array, original_hkl= generate_hkl_by_pg(hkl_orig_array, pg_key)
 
             if return_origin is False:
                 return hkl_array
@@ -1117,7 +1118,7 @@ class Sample():
         hkl_len = ((hkl_rotated[:, 0] ** 2 + hkl_rotated[:, 1] ** 2 + hkl_rotated[:, 2] ** 2) ** 0.5).reshape(-1, 1)
         hkl_array_norm = (hkl_rotated / hkl_len)
         hkl_array_norm = np.hstack((hkl_array_norm, cos_s_ki_ang_array))
-        print(f'1st step time {time.time()-start_}')
+        print(f'1st step time {time.time() - start_}')
 
         if scan_type == '???':
             angle_start = angles[no_of_scan]

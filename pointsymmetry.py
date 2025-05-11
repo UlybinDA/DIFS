@@ -1,6 +1,7 @@
 import numpy as np
 from my_logger import mylogger
 from encode_hkl import encode_hkl
+from generate_hkl_pg_wrapper import _generate_hkl_by_pg
 
 
 CENTRINGS = ('P', 'A', 'B', 'C', 'I', 'F', 'Robv', 'Rrev', 'H')
@@ -828,6 +829,11 @@ def generate_orig_hkl_array(h, k, l, pg, centring):
 
 @mylogger('DEBUG')
 def generate_hkl_by_pg(hkl_orig_array,pg_key):
+    general_positions = PG_GENS[pg_key]
+    return _generate_hkl_by_pg(hkl_orig_array,general_positions)
+
+@mylogger('DEBUG')
+def generate_hkl_by_pg_old(hkl_orig_array,pg_key):
     hkl_array = hkl_orig_array.copy().reshape(-1, 3, 1)
     general_positions = PG_GENS[pg_key]
     hkl_orig_array = hkl_orig_array.reshape(-1, 3, 1)
@@ -842,7 +848,7 @@ def generate_hkl_by_pg(hkl_orig_array,pg_key):
     indices = indices.reshape(-1,1)
     original_hkl = np.tile(hkl_orig_array.reshape(-1, 3), (num_of_gen_pos + 1, 1))[indices[:,0]]
     hkl_array = hkl_array[indices[:,0]]
-    return hkl_array, original_hkl, hkl_orig_array
+    return hkl_array, original_hkl
 
 def multiply_hkl_by_pg(hkl_orig_hkl,pg):
     pg_key = PG_KEYS[pg]
