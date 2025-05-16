@@ -13,7 +13,7 @@ logger.level("START", no=26, color="<magenta>")
 logger.level("PREVENT_U", no=26, color="<white>")
 
 log_file = "app.log"
-logger.add(log_file, format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {message}", rotation="10 MB")
+logger.add(log_file, format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {message}", rotation="10 MB", enqueue=True)
 logger.disable("START")
 logger.add("app.log", enqueue=True)
 

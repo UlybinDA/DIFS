@@ -305,9 +305,24 @@ class Experiment:
         unique1 = [data[boolarr1[:, 0]] if not (data is None) else None for data in [hkl1, hkl1_original]]
         return unique1
 
-    def generate_diffraction_map_3d(self, reflections, rotations, directions, angles_, rotation_directions, steps,
-                                    ranges, wavelength, names):
-        pass
+    def generate_diffraction_map_3d(self, reflections, yxz_rotations, initial_angles, xz_steps, xz_ranges,
+                                    check_collisions=False, factor_detector=False, factor_obstacles=True, det_prm=None):
+        detector = None
+        obstacles = None
+        if factor_detector:
+            assert self.det_geometry, 'No detector model, to factor in'
+            detector = Ray_obstacle(dist=det_prm['dist'], rot=det_prm['rot'], orientation=det_prm['orientation'],
+                                    geometry=self.det_geometry, height=self.det_height, width=self.det_width,
+                                    complex=self.det_complex, complex_format=self.det_complex_format,
+                                    diameter=self.det_diameter,disp_y=det_prm['disp_y'],disp_z=det_prm['disp_z'])
+        if factor_obstacles:
+            obstacles = self.obstacles
+
+        names = tuple(self.axes_names[i] for i in yxz_rotations)
+        fig = self.cell.mapv2(reflections=reflections, yxz_rotations=yxz_rotations, directions=self.axes_directions,
+                              angles=initial_angles, xz_steps=xz_steps, xz_ranges=xz_ranges, wavelength=self.wavelength,
+                              yxz_names=names, obstacles=obstacles, detector=detector, visualise=False,all_rotations=self.axes_rotations)
+        return fig
 
     def separate_unique_common(self):
         assert len(self.strategy_data_container.scan_data_containers) >= 2, 'Provide at least 2 scan'

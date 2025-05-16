@@ -14,7 +14,7 @@ from my_logger import mylogger
 from typing import Tuple, Union, Optional, List, Dict, Any
 from nptyping import NDArray, Shape, Float, Int
 from rotation_wrapper import apply_rotation
-from rotation import apply_rotation_matrix
+import random
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -41,6 +41,20 @@ def ang_bw_two_vects(vec1: np.ndarray,
             cos_array = (vec1[:, 0] * vec2[0] + vec1[:, 1] * vec2[1] + vec1[:, 2] * vec2[2]) / (
                     vec1[:, 0] ** 2 + vec1[:, 1] ** 2 + vec1[:, 2] ** 2) ** 0.5 / np.linalg.norm(vec2)
             return cos_array
+    return None
+
+
+def generate_random_hex_colors(num_colors):
+    hex_colors = []
+    for _ in range(num_colors):
+        r = random.randint(0, 255)
+        g = random.randint(0, 255)
+        b = random.randint(0, 255)
+
+        hex_color = "#{:02X}{:02X}{:02X}".format(r, g, b)
+        hex_colors.append(hex_color)
+
+    return hex_colors
 
 
 class Ray_obstacle():
@@ -210,6 +224,7 @@ class Ray_obstacle():
                 normals = rotation.apply(vec_origin_to_centre)
                 back_center = rotation.apply(np.array([chip_thickness, 0, 0]) + vec_origin_to_centre)
                 return (vecs, normals, back_center)
+        return None
 
     def calf_inter_cylinder(self,
                             data: np.ndarray,
@@ -264,6 +279,7 @@ class Ray_obstacle():
             check3 = (vecs[:, 0] * normal[0] + vecs[:, 1] * normal[1] + vecs[:, 2] * normal[2]) > 0
             check = (check0 & check1 & check2 & check3).reshape(-1, 1)
             return check
+        return None
 
     def calf_inter_plane(self,
                          data: np.ndarray,
@@ -389,6 +405,7 @@ class Ray_obstacle():
             back_wall_marker = np.vstack((np.zeros((data[0].shape[0], 1)), np.ones((data[1].shape[0], 1))))
             data_output = data + (intensity, back_wall_marker)
             return data_output
+        return None
 
     def array_slice(self,
                     array: np.ndarray,
@@ -484,6 +501,7 @@ class Ray_obstacle():
                 for array in data:
                     data_output += self.array_slice(array, check, mode)
                 return data_output
+            return None
 
         elif self.geometry == 'circle':
             if self.orientation == 'independent':
@@ -524,6 +542,7 @@ class Ray_obstacle():
                 for array in data:
                     data_output += self.array_slice(array, check, mode)
                 return data_output
+            return None
 
     def sift(self,
              data: Tuple[np.ndarray, ...],
@@ -860,6 +879,7 @@ class Sample():
                     matr3 = matr3 * R.from_euler(rotations3[i], angle3[i])
 
                 return (matr1.as_matrix(), matr3.as_matrix())
+            return None
 
     def coefficient_z(self,
                       matr13: Tuple[np.ndarray, np.ndarray],
@@ -965,7 +985,6 @@ class Sample():
         return (angle1, angle2, matr13)
 
     @staticmethod
-    @mylogger('DEBUG')
     def create_d_array(parameters: np.ndarray,
                        cell_vol: float,
                        hkl_array: np.ndarray) -> np.ndarray:
@@ -1086,12 +1105,14 @@ class Sample():
             d_array = d_array[d_array > d_range[0]].reshape(-1, 1)
             hkl_orig_array = hkl_orig_array[d_array[:, 0] < d_range[1]]
 
-            hkl_array, original_hkl= generate_hkl_by_pg(hkl_orig_array, pg_key)
+            hkl_array, original_hkl = generate_hkl_by_pg(hkl_orig_array, pg_key)
 
             if return_origin is False:
                 return hkl_array
             elif return_origin is True:
                 return hkl_array, original_hkl
+        else:
+            return None
 
     def scan(self,
              scan_type: str = '???',
@@ -1105,123 +1126,66 @@ class Sample():
              wavelength: float = 0.71073,
              only_angles: bool = False) -> Union[Tuple[np.ndarray, np.ndarray],
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
-        start__ = time.time()
-        print(f'n of reflection {hkl_array.shape[0]}')
         if hkl_array is None:
             raise Exception('hkl_array is None, please provide some reflections as numpy array object (-1,3)')
         elif hkl_array_orig is None:
             hkl_array_orig = hkl_array
-        start_ = time.time()
         d_array = self.create_d_array(self.parameters, self.cell_vol, hkl_array).reshape(-1, 1)
         cos_s_ki_ang_array = np.cos(np.deg2rad(90) - np.arcsin(wavelength / 2 / d_array))
         hkl_rotated = np.matmul(self.orient_matx, hkl_array.reshape(-1, 3, 1)).reshape(-1, 3)
         hkl_len = ((hkl_rotated[:, 0] ** 2 + hkl_rotated[:, 1] ** 2 + hkl_rotated[:, 2] ** 2) ** 0.5).reshape(-1, 1)
         hkl_array_norm = (hkl_rotated / hkl_len)
         hkl_array_norm = np.hstack((hkl_array_norm, cos_s_ki_ang_array))
-        print(f'1st step time {time.time() - start_}')
 
-        if scan_type == '???':
-            angle_start = angles[no_of_scan]
-            range_ = self.angle_range(scan_sweep, angle_start)
-            hkl_array = hkl_array.reshape(-1, 3)
-            T = hkl_array_norm[:, -1]
-            hkl_array_norm = hkl_array_norm[:, :3]
-            start_ = time.time()
-            solution = self.run(rotations, directions, angles, no_of_scan, hkl_array_norm.copy(), T)
-            print(f'solution time {time.time() - start_}')
-            angle1 = solution[0].reshape(-1, 1)
-            angle2 = solution[1].reshape(-1, 1)
-            matr1 = solution[2][0]
-            matr3 = solution[2][1]
+        angle_start = angles[no_of_scan]
+        range_ = self.angle_range(scan_sweep, angle_start)
+        hkl_array = hkl_array.reshape(-1, 3)
+        T = hkl_array_norm[:, -1]
+        hkl_array_norm = hkl_array_norm[:, :3]
+        solution = self.run(rotations, directions, angles, no_of_scan, hkl_array_norm.copy(), T)
+        angle1 = solution[0].reshape(-1, 1)
+        angle2 = solution[1].reshape(-1, 1)
+        matr1 = solution[2][0]
+        matr3 = solution[2][1]
 
-            angle1[angle1 < 0] = 2 * np.pi + angle1[angle1 < 0]
-            angle2[angle2 < 0] = 2 * np.pi + angle2[angle2 < 0]
+        angle1[angle1 < 0] = 2 * np.pi + angle1[angle1 < 0]
+        angle2[angle2 < 0] = 2 * np.pi + angle2[angle2 < 0]
 
-            angle1 = self.angles_in_sweep(angle1, range_[0], range_[1], range_[2])
-            angle2 = self.angles_in_sweep(angle2, range_[0], range_[1], range_[2])
-            if only_angles is True:
-                return (angle1, angle2)
+        angle1 = self.angles_in_sweep(angle1, range_[0], range_[1], range_[2])
+        angle2 = self.angles_in_sweep(angle2, range_[0], range_[1], range_[2])
+        if only_angles is True:
+            return (angle1, angle2)
 
-            hkl_rotated1 = hkl_rotated.copy()[~np.isnan(angle1[:, 0])].reshape(-1, 3)
-            hkl_rotated2 = hkl_rotated.copy()[~np.isnan(angle2[:, 0])].reshape(-1, 3)
-            hkl_array1 = hkl_array.copy()[~np.isnan(angle1[:, 0])].reshape(-1, 3)
-            hkl_array2 = hkl_array.copy()[~np.isnan(angle2[:, 0])].reshape(-1, 3)
-            hkl_array_orig1 = hkl_array_orig.copy()[~np.isnan(angle1[:, 0])].reshape(-1, 3)
-            hkl_array_orig2 = hkl_array_orig.copy()[~np.isnan(angle2[:, 0])].reshape(-1, 3)
-            angle1 = angle1[~np.isnan(angle1)].reshape(-1, 1)
-            angle2 = angle2[~np.isnan(angle2)].reshape(-1, 1)
+        hkl_rotated1 = hkl_rotated.copy()[~np.isnan(angle1[:, 0])].reshape(-1, 3)
+        hkl_rotated2 = hkl_rotated.copy()[~np.isnan(angle2[:, 0])].reshape(-1, 3)
+        hkl_array1 = hkl_array.copy()[~np.isnan(angle1[:, 0])].reshape(-1, 3)
+        hkl_array2 = hkl_array.copy()[~np.isnan(angle2[:, 0])].reshape(-1, 3)
+        hkl_array_orig1 = hkl_array_orig.copy()[~np.isnan(angle1[:, 0])].reshape(-1, 3)
+        hkl_array_orig2 = hkl_array_orig.copy()[~np.isnan(angle2[:, 0])].reshape(-1, 3)
+        angle1 = angle1[~np.isnan(angle1)].reshape(-1, 1)
+        angle2 = angle2[~np.isnan(angle2)].reshape(-1, 1)
 
-            start_ = time.time()
-            # if angle1.shape != (0,1):
-            #
-            #     rotation1 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
-            #                                                     angle1 * directions[no_of_scan]) * R.from_matrix(matr3)
-            #     hkl_rotated1 = rotation1.apply(hkl_rotated1)
-            #     diff_vec1 = hkl_rotated1 + np.array([1 / wavelength, 0, 0])
-            # else:
-            #     diff_vec1 = np.array([]).reshape(-1,3)
-            #
-            # if angle2.shape != (0,1):
-            #     rotation2 = R.from_matrix(matr1) * R.from_euler(rotations[no_of_scan],
-            #                                                     angle2 * directions[no_of_scan]) * R.from_matrix(matr3)
-            #     hkl_rotated2 = rotation2.apply(hkl_rotated2)
-            #     diff_vec2 = hkl_rotated2 + np.array([1 / wavelength, 0, 0])
-            # else:
-            #     diff_vec2 = np.array([]).reshape(-1,3)
+        if angle1.shape != (0, 1):
+            diff_vec1 = apply_rotation(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated1,
+                                       angles=angle1, directions=directions, wavelength=wavelength, matr1=matr1,
+                                       matr3=matr3)
+        else:
+            diff_vec1 = np.array([]).reshape(-1, 3)
 
-            # if angle1.shape != (0, 1):
-            #     axis_char = rotations[no_of_scan]  # 'x', 'y', 'z'
-            #     axis = {'x': 0, 'y': 1, 'z': 2}[axis_char]
-            #     diff_vec1 = apply_rotation_matrix(
-            #         vectors=hkl_rotated1,
-            #         angles=angle1[:, 0],
-            #         matr1=matr1,
-            #         matr3=matr3,
-            #         axis=axis,
-            #         direction=directions[no_of_scan],
-            #         inv_wavelength=1.0 / wavelength
-            #     )
-            # else:
-            #     diff_vec1 = np.array([]).reshape(-1, 3)
-            #
-            # if angle2.shape != (0, 1):
-            #     axis_char = rotations[no_of_scan]
-            #     axis = {'x': 0, 'y': 1, 'z': 2}[axis_char]
-            #
-            #     diff_vec2 = apply_rotation_matrix(
-            #         vectors=hkl_rotated2,
-            #         angles=angle2[:, 0],
-            #         matr1=matr1,
-            #         matr3=matr3,
-            #         axis=axis,
-            #         direction=directions[no_of_scan],
-            #         inv_wavelength=1.0 / wavelength
-            #     )
-            # else:
-            #     diff_vec2 = np.array([]).reshape(-1, 3)
-            if angle1.shape != (0, 1):
-                diff_vec1 = apply_rotation(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated1,
-                                           angles=angle1, directions=directions, wavelength=wavelength, matr1=matr1,
-                                           matr3=matr3)
-            else:
-                diff_vec1 = np.array([]).reshape(-1, 3)
+        if angle2.shape != (0, 1):
+            diff_vec2 = apply_rotation(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated2,
+                                       angles=angle2, directions=directions, wavelength=wavelength, matr1=matr1,
+                                       matr3=matr3)
+        else:
+            diff_vec2 = np.array([]).reshape(-1, 3)
 
-            if angle2.shape != (0, 1):
-                diff_vec2 = apply_rotation(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated2,
-                                           angles=angle2, directions=directions, wavelength=wavelength, matr1=matr1,
-                                           matr3=matr3)
-            else:
-                diff_vec2 = np.array([]).reshape(-1, 3)
-            print(f'vec rotations time {time.time() - start_}')
+        angles_all = np.vstack((angle1, angle2))
 
-            angles_all = np.vstack((angle1, angle2))
-
-            hkl_all = np.vstack((hkl_array1, hkl_array2))
-            hkl_array_orig_all = np.vstack((hkl_array_orig1, hkl_array_orig2))
-            diff_vec_all = np.vstack((diff_vec1, diff_vec2))
-            diff_vec_all = diff_vec_all / np.linalg.norm(diff_vec_all, axis=1).reshape(-1, 1)
-            print(f'overall time {time.time() - start__}')
-            return (diff_vec_all, hkl_all, hkl_array_orig_all, angles_all)
+        hkl_all = np.vstack((hkl_array1, hkl_array2)).astype(np.int32)
+        hkl_array_orig_all = np.vstack((hkl_array_orig1, hkl_array_orig2))
+        diff_vec_all = np.vstack((diff_vec1, diff_vec2))
+        diff_vec_all = diff_vec_all / np.linalg.norm(diff_vec_all, axis=1).reshape(-1, 1)
+        return (diff_vec_all, hkl_all, hkl_array_orig_all, angles_all)
 
     def calc_scan_vect(self,
                        rotations: str,
@@ -1267,71 +1231,163 @@ class Sample():
 
     def mapv2(self,
               reflections: np.ndarray,
-              rotations: str,
-              directions: Tuple[int, int, int],
-              angles: Tuple[float, float, float],
-              rotation_directions: Tuple[int, int, int],
-              steps: Tuple[float, float],
-              ranges: Tuple[Tuple[float, float], Tuple[float, float]],
+              directions: Tuple[int],
+              angles: Tuple[float],
+              all_rotations: Tuple[str],
+              yxz_rotations: Tuple[int],
+              xz_steps: Tuple[float, float],
+              xz_ranges: Tuple[Tuple[float, float], Tuple[float, float]],
               wavelength: float,
-              names: Tuple[str, str, str],
+              yxz_names: Tuple[str, str, str],
+              obstacles=None,
+              detector=None,
               visualise: bool = True) -> Union[None, go.Figure]:
-
-        x_range = np.arange(ranges[0][0], ranges[0][1], steps[1])
-        z_range = np.arange(ranges[1][0], ranges[1][1], steps[1])
-        x_len = len(x_range)
-        z_len = len(z_range)
+        assert detector is None or isinstance(detector, Ray_obstacle), 'Wrong detector format'
+        assert obstacles is None or all(
+            isinstance(obstacle, Ray_obstacle) for obstacle in obstacles), 'Wrong obstacle format'
+        x_range = np.arange(xz_ranges[0][0], xz_ranges[0][1], xz_steps[0])
+        z_range = np.arange(xz_ranges[1][0], xz_ranges[1][1], xz_steps[1])
         angles_ = list(angles)
-        n_of_reflections = reflections.shape[0]
-        first = True
+        diffraction_vecs_list = []
+        diffraction_angles_list = []
+        hkl_list = []
+        anglesx_list = []
+        anglesz_list = []
         for anglez in z_range:
-            angles_[rotation_directions[2]] = anglez
+            angles_[yxz_rotations[2]] = anglez
             for anglex in x_range:
-                angles_[rotation_directions[1]] = anglex
+                angles_[yxz_rotations[1]] = anglex
 
-                angle1, angle2 = self.scan(scan_type='???', scan_sweep=360, rotations=rotations, angles=angles_,
-                                           directions=directions, no_of_scan=rotation_directions[0],
-                                           hkl_array=reflections, hkl_array_orig=reflections,
-                                           wavelength=wavelength, only_angles=True)
-                if first is True:
-                    first = False
-                    angle1_array = angle1
-                    angle2_array = angle2
+                diff_vecs, hkl_array, _, angles_array = self.scan(scan_type='???', scan_sweep=360, rotations=all_rotations,
+                                                                  angles=angles_, directions=directions,
+                                                                  no_of_scan=yxz_rotations[0],
+                                                                  hkl_array=reflections, hkl_array_orig=reflections,
+                                                                  wavelength=wavelength)
+                diffraction_vecs_list.append(diff_vecs)
+                diffraction_angles_list.append(angles_array)
+                hkl_list.append(hkl_array)
+                n_data = diff_vecs.shape[0]
+                anglesx_list.append(np.full(n_data, anglex).reshape(-1, 1))
+                anglesz_list.append(np.full(n_data, anglez).reshape(-1, 1))
+
+        diff_vecs_array = np.vstack(diffraction_vecs_list)
+        diff_angles_array = np.vstack(diffraction_angles_list)
+        hkl_array = np.vstack(hkl_list)
+        anglesx = np.vstack(anglesx_list)
+        anglesz = np.vstack(anglesz_list)
+
+        data_in = (diff_vecs_array, diff_angles_array, hkl_array, anglesx, anglesz)
+
+        def hkl_to_str(hkl_array):
+            hkl_str = np.char.add(np.char.add(hkl_array[:, 0].astype(str), ' '),
+                                  np.char.add(hkl_array[:, 1].astype(str), ' '))
+            hkl_str = np.char.add(hkl_str, hkl_array[:, 2].astype(str))
+
+            return hkl_str
+
+        data_out = [(np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 3),
+                     np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 1))]
+        if detector:
+            data = detector.filter(diff_vecs=diff_vecs_array, data=data_in, mode='separate')
+            data_in = [i for i in data[::2]]
+            data_ = [i for i in data[1::2]]
+            data_out.append(data_)
+
+        if obstacles:
+            for obstacle in obstacles:
+                data = obstacle.filter(diff_vecs=diff_vecs_array, data=data_in, mode='separate')
+                data_in = [i for i in data[::2]]
+                data_ = [i for i in data[1::2]]
+                data_out.append(data_)
+
+        if len(data_out) >= 2:
+            for i in range(len(data_out)):
+                if i == 0:
+                    vals = data_out[i]
+                    tmp_container = [[j] for j in vals]
                 else:
-                    angle1_array = np.concatenate((angle1_array, angle1))
-                    angle2_array = np.concatenate((angle2_array, angle2))
-        angle1_array = np.rad2deg(np.vstack((angle1_array, angle2_array)))
-        x_angle_array = np.tile(np.tile(np.tile(np.array(x_range).reshape(-1, 1), (1, n_of_reflections)).reshape(-1, 1),
-                                        (z_len, 1)), (2, 1))
-        z_angle_array = np.tile(np.tile(np.array(z_range).reshape(-1, 1), (1, n_of_reflections * x_len)).reshape(-1, 1),
-                                (2, 1))
+                    for n, j in enumerate(data_out[i]):
+                        tmp_container[n].append(j)
+            data_out = [np.vstack(i) for i in tmp_container]
+        else:
+            data_out = (np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 3),
+                        np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 1))
 
-        hkl_str = np.tile(np.tile(
-            np.char.add(np.char.add(np.char.add(np.char.add(reflections[:, 0].astype(int).astype(str), ' '),
-                                                reflections[:, 1].astype(int).astype(str)), ' '),
-                        reflections[:, 2].astype(int).astype(str)).reshape(-1, 1), (x_len * z_len, 1)), (2, 1))
+        diff_vecs_array_i, diff_angles_array_i, hkl_array_i, anglesx_i, anglesz_i = data_in
+        diff_vecs_array_o, diff_angles_array_o, hkl_array_o, anglesx_o, anglesz_o = data_out
 
-        random_rgb_colors1 = (
-            np.round(np.tile(np.tile(np.random.rand(n_of_reflections), (1, x_len * z_len)), (1, 2)) * 360)).astype(str)
-        random_rgb_colors2 = (
-            np.round(np.tile(np.tile(np.random.rand(n_of_reflections), (1, x_len * z_len)), (1, 2)) * 360)).astype(str)
-        random_rgb_colors3 = (
-            np.round(np.tile(np.tile(np.random.rand(n_of_reflections), (1, x_len * z_len)), (1, 2)) * 360)).astype(str)
-        color_rgb_array = np.char.add(np.char.add(
-            np.char.add(np.char.add(np.char.add(np.char.add('rgb(', random_rgb_colors1), ', '), random_rgb_colors2, ),
-                        ', '), random_rgb_colors3), ')')
+        diff_angles_array_i = np.rad2deg(diff_angles_array_i)
+        diff_angles_array_o = np.rad2deg(diff_angles_array_o)
 
-        data = {
-            f'{names[0]}': angle1_array.reshape(-1),
-            f'{names[1]}': x_angle_array.reshape(-1),
-            f'{names[2]}': z_angle_array.reshape(-1),
-            'hkl': hkl_str.reshape(-1),
+        x_all = np.concatenate([anglesx_i, anglesx_o])
+        y_all = np.concatenate([diff_angles_array_i, diff_angles_array_o])
+        z_all = np.concatenate([anglesz_i, anglesz_o])
+        mask = np.ones(len(diff_angles_array_i), dtype=bool).reshape(-1, 1)
+        hkl_str_i = hkl_to_str(hkl_array_i.astype(int))
+        hkl_str_o = hkl_to_str(hkl_array_o.astype(int))
+        hkl_str_i = hkl_str_i.reshape(-1, 1) if hkl_str_i.ndim == 1 else hkl_str_i
+        hkl_str_o = hkl_str_o.reshape(-1, 1) if hkl_str_o.ndim == 1 else hkl_str_o
+
+        mask_in = np.array([*([1, ] * len(hkl_str_i)), *([0, ] * len(hkl_str_o))]).astype(bool).reshape(-1, 1)
+        hkl_str_all = np.vstack((hkl_str_i, hkl_str_o))
+        x_all_flat = x_all.reshape(-1)
+        y_all_flat = y_all.reshape(-1)
+        z_all_flat = z_all.reshape(-1)
+        hkl_str_all_flat = hkl_str_all.reshape(-1)
+        mask_in_flat = mask_in.reshape(-1).astype(bool)
+
+        unique_hkl_i = np.unique(hkl_str_i)
+
+        unique_hkl_all = np.unique(hkl_str_all_flat)
+
+        color_map = {
+            hkl: color
+            for hkl, color in zip(
+                unique_hkl_i,
+                generate_random_hex_colors(len(unique_hkl_i))
+            )
         }
-        df = pd.DataFrame(data=data)
-        fig = px.scatter_3d(df, x=f'{names[0]}', y=f'{names[1]}', z=f'{names[2]}', color='hkl')
-        fig.update_traces(marker_size=1.5)
-        fig.layout.scene.camera.projection.type = "orthographic"
-        if visualise == True:
+        fig = go.Figure()
+
+        for hkl in unique_hkl_all:
+            hkl_mask = (hkl_str_all_flat == hkl)
+
+            x_hkl = x_all_flat[hkl_mask].tolist()
+            y_hkl = y_all_flat[hkl_mask].tolist()
+            z_hkl = z_all_flat[hkl_mask].tolist()
+            mask_in_hkl = mask_in_flat[hkl_mask].tolist()
+
+            colors = [
+                color_map.get(hkl, '#808080') if is_in else '#FF0000'
+                for is_in in mask_in_hkl
+            ]
+
+            sizes = [4.0 if is_in else 2.0 for is_in in mask_in_hkl]
+
+            fig.add_trace(go.Scatter3d(
+                x=x_hkl,
+                y=y_hkl,
+                z=z_hkl,
+                mode='markers',
+                name=hkl,
+                marker=dict(
+                    size=sizes,
+                    color=colors,
+                    opacity=0.8
+                ),
+                legendgroup=hkl,
+                showlegend=True
+            ))
+
+        fig.update_layout(scene_camera=dict(projection=dict(type='orthographic')))
+        fig.update_layout(
+            scene=dict(
+                xaxis_title=yxz_names[1],
+                yaxis_title=yxz_names[0],
+                zaxis_title=yxz_names[2]
+            )
+        )
+        if visualise:
             fig.show()
         else:
             return fig

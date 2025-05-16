@@ -1,11 +1,12 @@
-colorama==0.4.6
-dash==2.18.0
+colorama
+dash
 dash_bootstrap_components==1.6.0
 dash_extensions==1.0.18
 loguru==0.7.3
 numpy==1.26.4
 pandas==2.2.3
-plotly==5.24.0
+plotly
 psutil==6.1.0
 scipy==1.14.1
 nptyping
+dash-ag-grid

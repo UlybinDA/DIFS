@@ -2,6 +2,7 @@ from dash import dash_table, html
 from dash.dash_table.Format import Format, Scheme
 import pandas as pd
 import dash_ag_grid as dag
+from my_logger import mylogger
 
 
 def generate_choose_scan_dropdown(exp_inst, id_, style, style_cell):
@@ -376,7 +377,7 @@ def generate_empty_dag_for_cumulative_completeness(id_):
                     """
             }
         },
-        {"field": "completeness", "headerName": "Completeness","sortable": True},
+        {"field": "completeness", "headerName": "Completeness", "sortable": True},
         {"field": "run_order", "hide": True},
         {"field": "min_angles", "hide": True},
         {"field": "max_angles", "hide": True},
@@ -597,3 +598,103 @@ def get_range_dag(id_):
         ),
         style={"display": "inline-block", "padding": "2px"},
     )
+
+@mylogger('DEBUG',log_args=True)
+def get_diff_map_detector(id_):
+    df = pd.DataFrame({
+        'factor_detector': [False],
+        'd_dist': [40],
+        'rot_x': [0],
+        'rot_y': [0],
+        'rot_z': [0],
+        'orientation': ['normal'],
+        'disp_y': [0],
+        'disp_z': [0],
+    })
+    return html.Div(
+        dag.AgGrid(
+            style={'width':1000,'height':85},
+            id=id_,
+            dashGridOptions={
+                "onGridReady": {
+                    "function": """
+            function(params) {
+                window.myGridApi = params.api;
+                window.myColumnApi = params.columnApi;
+            }
+            """
+                },
+            },
+            columnDefs=[
+                {
+                    "field": "factor_detector",
+                    "headerName": "account",
+                    "editable": True,
+                    "width": 100,
+                    "cellRenderer": "agCheckboxCellRenderer",
+                    "cellEditor": "agCheckboxCellEditor",
+                },
+                {
+                    "field": "d_dist",
+                    "headerName": "Distance",
+                    "editable": True,
+                    "width": 90,
+                    "hide": False,
+                },
+                {
+                    "field": "rot_x",
+                    "headerName": "Rotation x",
+                    "editable": True,
+                    "width": 100,
+                },
+                {
+                    "field": "rot_y",
+                    "headerName": "Rotation y",
+                    "editable": True,
+                    "width": 100,
+                },
+                {
+                    "field": "rot_z",
+                    "headerName": "Rotation z",
+                    "editable": True,
+                    "width": 100,
+                },
+                {
+                    "field": "orientation",
+                    "headerName": "Orientation",
+                    "editable": True,
+                    "width": 100,
+                    "cellEditor": "agSelectCellEditor",
+                    "cellEditorParams": {"values": ["normal", "independent"]},
+
+                },
+                {
+                    "field": "disp_y",
+                    "headerName": "Disp y",
+                    "editable": {
+                        "function": "params.data.orientation === 'independent' && Object.prototype.toString.call(params.data.geometry) === '[object String]'"},
+                    "width": 80,
+                    "cellClassRules":{
+                        "hide-cell": "params.data.orientation === 'normal'"
+                    },
+                    'headerClass':"hide-cell",
+                },
+                {
+                    "field": "disp_z",
+                    "headerName": "Disp z",
+                    "editable": {
+                        "function": "params.data.orientation === 'independent' && Object.prototype.toString.call(params.data.geometry) === '[object String]'"},
+                    "width": 80,
+                    "cellClassRules": {
+                        "hide-cell": "params.data.orientation === 'normal'"
+                    },
+                    'headerClass':"hide-cell",
+
+                },
+
+            ],
+            rowData=df.to_dict('records'),
+
+        )
+    )
+

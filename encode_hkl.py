@@ -1,5 +1,6 @@
-
+from my_logger import mylogger
 #max index 500
+@mylogger('DEBUG')
 def encode_hkl(array):
     base = 1001
     array = array.astype(int)

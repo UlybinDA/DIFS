@@ -62,7 +62,6 @@ class Content_variables():
              'TM3': [0, 0, 1]
              }).to_dict('records')
         self.goniometer_table = pd.DataFrame(
-            # np.array([['', '', '', ''],]),
             columns=('rotation', 'direction', 'name', 'real', 'angle')).to_dict('records')
         self.detector_geometry = pd.DataFrame(np.array([['', '', '', '']]),
                                               columns=('d_geometry', 'height', 'width', 'diameter')).to_dict('records')
@@ -95,8 +94,6 @@ SIDEBAR_STYLE = {
     "background-color": "#5C5C5C",
 }
 
-# the styles for the main content position it to the right of the sidebar and
-# add some padding.
 CONTENT_STYLE = {
     "margin-left": "18rem",
     "margin-right": "2rem",
@@ -133,7 +130,6 @@ sidebar = html.Div(
         ),
     ],
     className="sidebar",
-    # style=SIDEBAR_STYLE,
 )
 
 first_page = html.Div([
@@ -245,7 +241,6 @@ first_page = html.Div([
                 'display': 'none'
             },
             style_table={
-                # 'overflowX': 'scroll'
             },
             style_cell={
                 'height': '0px',
@@ -363,7 +358,6 @@ first_page = html.Div([
                 ],
                 editable=True,
                 style_table={
-                    # 'overflowX': 'scroll'
                 },
                 style_cell={
                     'height': '0px',
@@ -466,9 +460,6 @@ second_page = html.Div([
                 {'name': 'angle, °', 'id': 'ang_col', 'type': 'numeric',
                  'format': Format(precision=1, scheme=Scheme.decimal_integer)},
             ],
-            # style_header={
-            #     'display': 'none'
-            # },
             dropdown={
                 'rotation_col': {
                     'options': [
@@ -500,9 +491,7 @@ second_page = html.Div([
                     n_clicks=0,
                     style={
                         'vertical-align': 'top',
-                        # 'display': 'inline-block',
                         'height': '30px',
-                        # 'width': '30px',
                     }
                     ),
 
@@ -532,7 +521,6 @@ second_page = html.Div([
                         'vertical-align': 'top',
                         'display': 'inline-block',
                         'height': '30px',
-                        # 'width': '30px',
                     }
                     ),
         dcc.Download(id='download_goniometer', ),
@@ -568,13 +556,9 @@ second_page = html.Div([
                                  id='rectangle_parameter_table',
                                  data=content_vars.detector_geometry_rectangle_parameters,
                                  editable=True,
-                                 # columns=content_vars.colums_goniometer_table,
                                  columns=[{'name': i[:-4], 'id': i, 'type': 'numeric'} for i in
                                           list(pd.DataFrame.from_records(
                                               content_vars.detector_geometry_rectangle_parameters))],
-                                 # style_header={
-                                 #     'display': 'none'
-                                 # },
                                  style_cell={
                                      'width': '30px'
                                  }, )
@@ -603,7 +587,6 @@ second_page = html.Div([
                                  id='circle_parameter_table',
                                  data=content_vars.detector_geometry_circle_parameters,
                                  editable=True,
-                                 # columns=content_vars.colums_goniometer_table,
                                  columns=[{'name': i[:-4], 'id': i, 'type': 'numeric'} for i in
                                           list(pd.DataFrame.from_records(
                                               content_vars.detector_geometry_circle_parameters))],
@@ -630,7 +613,6 @@ second_page = html.Div([
                         'vertical-align': 'top',
                         'display': 'inline-block',
                         'height': '30px',
-                        # 'width': '30px',
                     }
                     ),
         dcc.Download(id='download_detector', ),
@@ -709,7 +691,6 @@ second_page = html.Div([
                         'vertical-align': 'top',
                         'display': 'inline-block',
                         'height': '30px',
-                        # 'width': '30px',
                     }
                     ),
         dcc.Download(id='download_obstacles', ),
@@ -773,22 +754,8 @@ third_page = html.Div([
     html.Div(
         list(),
         id='runs_div'
-    ),
-    html.Button(
-        'Add temporary obstacle',
-        id='add_tmp_obst_button',
-        n_clicks=0),
-    html.Button(
-        'Delete temporary obstacles',
-        id='clear_tmp_obst_button',
-        n_clicks=0),
-    html.Button(
-        'Set temporary obstacles',
-        id='set_tmp_obst_button',
-        n_clicks=0),
-    html.Div(
-        list(),
-        id='tmp_obst_div')
+    )
+
 ])
 
 modal4 = html.Div([
@@ -1039,8 +1006,10 @@ fourth_page = html.Div([
                       id='dropdown_map_switcher',
                       clearable=False,
                       value='',
-                      style={'width': '200px'}
+                      style={'width': '200px'},
+
                   ),
+                  apg.get_diff_map_detector(id_='diff_map_detector'),
                   html.Div(id='map_input_container'),
                   html.Button('map for selected', id='map_selected_button', n_clicks=0), ]
                  , style={'display': 'inline-block', }),
@@ -1255,7 +1224,7 @@ def get_stored_page_2_data(flag, runs):
     Output('multiplicity_graph', 'figure', allow_duplicate=True),
     Output('redundancy_graph', 'figure', allow_duplicate=True),
     Output('rec_space_viewer_graph', 'figure', allow_duplicate=True),
-    Output('completeness_dag','rowData'),
+    Output('completeness_dag', 'rowData'),
     Output('cumulative_plot_graph', 'figure'),
     Output("page-3_stored_flag", "data", allow_duplicate=True),
     Input("page-3_stored_flag", "data"),
@@ -1270,10 +1239,11 @@ def get_stored_page_2_data(flag, runs):
     State('stored_cumulative_dag_data', 'data'),
     State('stored_cumulative_plot', 'data'),
     prevent_initial_call=True)
-def get_stored_page_3_data(flag, centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space,dag_cum,cum_plot):
+def get_stored_page_3_data(flag, centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space, dag_cum,
+                           cum_plot):
     if not flag:
         raise dash.exceptions.PreventUpdate()
-    storage_data_list = [centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space,dag_cum,cum_plot]
+    storage_data_list = [centring, d_range, pg, comp_val, comp_plot, mult_plot, red_plot, rec_space, dag_cum, cum_plot]
     output_list = [if_val_None_return_no_upd_else_return(val) for val in storage_data_list]
     output_list += [False, ]
     return output_list
@@ -1566,7 +1536,6 @@ def set_detector(n_clicks, geometry, rectangle_prm_table_data, circle_prm_table_
             return {'background-color': 'green'}, circle_prm_table_data, None, geometry
     elif geometry == 'Rectangle':
         rectangle_prm_data = np.array(pd.DataFrame.from_records(rectangle_prm_table_data).iloc[0])
-        #
         mask = rectangle_prm_data != 0
         mask1 = rectangle_prm_data.astype('str') != ''
         if np.count_nonzero(mask) != 2:
@@ -1958,7 +1927,6 @@ def raise_modal2(children):
     return children[0], children[1], children[2]
 
 
-# exp1.rotations
 @callback(
     Output('modal3', 'is_open'),
     Output('modal_header3', 'children'),
@@ -2685,7 +2653,6 @@ def unknown_to_active(n_clicks):
     return patched_fig
 
 
-# sel_points_button
 @callback(
     Output('rec_space_viewer_graph', 'figure', allow_duplicate=True),
     Input('sel_points_button', 'n_clicks'),
@@ -2906,17 +2873,18 @@ def map_switch(value):
 @callback(
     Output('diffraction_map_graph', 'figure'),
     Output('diff_map_workaround_P', 'children'),
-    # Output('diff_map_workaround_P', 'children'),
     Input('map_selected_button', 'n_clicks'),
     State('dropdown_map_switcher', 'value'),
-    State('map_input_container', 'children')
+    State('map_input_container', 'children'),
+    State('diff_map_detector', 'rowData')
 )
 @mylogger(level='DEBUG')
-def calculate_diff_map(n_clicks, map_type, data_container):
+def calculate_diff_map(n_clicks, map_type, data_container, det_data):
     if n_clicks == 0:
         raise dash.exceptions.PreventUpdate()
     if content_vars.active_space_fig is None:
         raise dash.exceptions.PreventUpdate()
+    det_data = det_data[0]
     selected_trace_n = content_vars.active_space_fig.n_traces - 1
     selected_reflections = content_vars.active_space_fig.fig.data[selected_trace_n]['customdata'][:, :].copy()
     selected_reflections.flags.writeable = True
@@ -2934,17 +2902,24 @@ def calculate_diff_map(n_clicks, map_type, data_container):
             np.random.shuffle(selected_reflections)
             reflections = selected_reflections[: N_OF_RAND_REF, :3]
         yxz_axes = (axes_data['y_axis'], axes_data['x_axis'], axes_data['z_axis'])
-        print(yxz_axes)
         angles = list(angles_data.values())
         range_x, step_x = [(range_step_data['x_min'], range_step_data['x_max']), range_step_data['x_step']]
         range_z, step_z = [(range_step_data['z_min'], range_step_data['z_max']), range_step_data['z_step']]
-        names = (exp1.axes_names[yxz_axes[0]], exp1.axes_names[yxz_axes[1]], exp1.axes_names[yxz_axes[2]])
-
-        fig = exp1.cell.mapv2(reflections, rotations=exp1.axes_rotations, angles=angles,
-                              directions=exp1.axes_directions, rotation_directions=yxz_axes, steps=(step_x, step_z),
-                              ranges=(range_x, range_z), wavelength=exp1.wavelength,
-                              names=names, visualise=False)
+        if det_data['factor_detector']:
+            det_prm = {'dist': det_data['d_dist'],
+                       'rot': (det_data['rot_x'], det_data['rot_y'], det_data['rot_z']),
+                       'orientation': det_data['orientation'],
+                       'disp_y': det_data['disp_y'],
+                       'disp_z': det_data['disp_z']}
+            fig = exp1.generate_diffraction_map_3d(reflections=reflections,yxz_rotations=yxz_axes,
+                                                   xz_steps=(step_x,step_z),xz_ranges=(range_x,range_z),
+                                                   factor_detector=True,det_prm=det_prm,initial_angles=angles)
+        else:
+            fig = exp1.generate_diffraction_map_3d(reflections=reflections, yxz_rotations=yxz_axes,
+                                                   xz_steps=(step_x, step_z), xz_ranges=(range_x, range_z),
+                                                   initial_angles=angles)
         return fig, '3d map'
+
 
     elif map_type == '2d map':
         N_OF_RAND_REF = 100
@@ -3021,6 +2996,7 @@ def generate_angle_table(id_, style, style_cell):
         style=style
     )
     return input_angles_table
+
 
 
 @callback(
@@ -3111,7 +3087,7 @@ def update_row_order(virtual_data, current_data):
         if original_row:
             new_row = {
                 **original_row,
-                "order": i  # Только обновляем порядок
+                "order": i
             }
             updated_data.append(new_row)
     return updated_data
@@ -3135,10 +3111,10 @@ def sort_run_calc_comp_plots(n_clicks, dag_data, d_range):
     try:
         input_params = sf.cumulative_dag_row_data_processing(dag_data)
     except CalcCumulativeCompletenessError as e:
-        return no_upd,no_upd,no_upd,no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
+        return no_upd, no_upd, no_upd, no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
 
-    sf.process_d_range(exp1,d_range)
-    sf.update_data_container(exp1,input_params, len(dag_data))
+    sf.process_d_range(exp1, d_range)
+    sf.update_data_container(exp1, input_params, len(dag_data))
 
     fig, completeness = exp1.generate_1d_comp_cumulative_plot(order=True)
     updated_dag = sf.update_completeness_data(dag_data, completeness)
@@ -3164,10 +3140,10 @@ def run_calc_comp_plots(n_clicks, dag_data, d_range):
     try:
         input_params = sf.cumulative_dag_row_data_processing(dag_data)
     except CalcCumulativeCompletenessError as e:
-        return no_upd,no_upd,no_upd,no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
+        return no_upd, no_upd, no_upd, no_upd, (True, e.error_modal_content.header, e.error_modal_content.body)
 
-    sf.process_d_range(exp1,d_range)
-    sf.update_data_container(exp1,input_params, len(dag_data))
+    sf.process_d_range(exp1, d_range)
+    sf.update_data_container(exp1, input_params, len(dag_data))
     fig, completeness = exp1.generate_1d_comp_cumulative_plot(
         order=False,
         permutation_indices=input_params['run_order']
@@ -3175,6 +3151,28 @@ def run_calc_comp_plots(n_clicks, dag_data, d_range):
     updated_dag = sf.update_completeness_data(dag_data, completeness)
 
     return fig, fig, updated_dag, updated_dag, dash.no_update
+
+
+@app.callback(
+    Output('diff_map_detector', 'columnDefs'),
+    Input('diff_map_detector', 'cellValueChanged'),
+    State('diff_map_detector', 'columnDefs'),
+)
+@mylogger(level='DEBUG')
+def hide_columns_map_detector(changed_cell, coldefs):
+    if not changed_cell or changed_cell[0]['colId'] != 'orientation':
+        return no_upd
+
+    new_coldefs = copy.deepcopy(coldefs)
+    hide_columns = changed_cell[0]['value'] == 'normal'
+
+    for col in new_coldefs:
+        if col['field'] in ['disp_y', 'disp_z']:
+            col['hide'] = hide_columns
+            col.pop('headerClass', None)
+
+    return new_coldefs
+
 
 if __name__ == '__main__':
     app.run(debug=True, )

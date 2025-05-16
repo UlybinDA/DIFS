@@ -24,3 +24,13 @@ h1 {
 .ag-row.invalid-row {
     background-color: rgba(255, 0, 0, 0.2) !important;
 }
+.hide-cell {
+    visibility: hidden !important;
+    height: 1px !important;
+    max-height: 1px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: none !important;
+    color: transparent !important;
+}
+

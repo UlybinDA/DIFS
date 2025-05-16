@@ -1,7 +1,6 @@
 # distutils: language = c++
 # cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True
 
-import numpy as np
 cimport numpy as np
 from cython cimport boundscheck, wraparound
 cimport cython
@@ -18,8 +17,6 @@ def apply_rotation_matrix(
     double direction,
     double inv_wavelength
 ):
-
-
     cdef Py_ssize_t n = vectors.shape[0]
     cdef np.ndarray[np.float64_t, ndim=2] result = np.empty((n, 3), dtype=np.float64)
 

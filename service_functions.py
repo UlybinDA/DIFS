@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 import re
-
+import random
 import rgb_colors
 from main import Sample
 from my_logger import mylogger
@@ -2101,6 +2101,9 @@ def update_completeness_data(dag_data, completeness):
     for n, run in enumerate(dag_data):
         run['completeness'] = completeness.get(n, None)
     return dag_data
+
+
+
 
 
 
