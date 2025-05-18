@@ -1,90 +1,169 @@
 [
-	{
-	 "name": "detector distance out of range",
-	 "problem": "detector distance should be between 90 and 160 mm",
-	 "level": 1,
-	 "parameter": "d_dst",
-	 "pre_condition": null,
-	 "condition": [["d_dist>=90","d_dist<=160"]]
-	},
-	{
-	 "name": "kappa angle out of range",
-	 "problem": "absolute kappa angle should be less than 72 degrees",
-	 "level": 1,
-	 "parameter": "kappa",
-	 "pre_condition": null,
-	 "condition": [["abs(kappa)<=72"]]
-	},
-	{
-	 "name": "non-scanning axis: kappa",
-	 "problem": "kappa axis cannot be scanning",
-	 "level": 2,
-	 "parameter": "scan_ax",
-	 "pre_condition": null,
-	 "condition": [["scan_ax!='kappa'"]]
-	},
-	{
-	 "name": "omega sweep exceeded",
-	 "problem": "omega sweep cannot be greater than 120 degrees for non-zero kappa",
-	 "level": 3,
-	 "parameter": "omega",
-	 "pre_condition": ["kappa!=0","scan_ax=='omega'"],
-	 "condition": [["sweep<=120"]]
-	},
-   {
+  {
+    "name": "detector distance out of range",
+    "problem": "detector distance should be between 90 and 160 mm",
+    "level": 1,
+    "parameter": "d_dst",
+    "pre_condition": null,
+    "condition": [
+      [
+        "d_dist>=90",
+        "d_dist<=160"
+      ]
+    ]
+  },
+  {
+    "name": "kappa angle out of range",
+    "problem": "absolute kappa angle should be less than 72 degrees",
+    "level": 1,
+    "parameter": "kappa",
+    "pre_condition": null,
+    "condition": [
+      [
+        "abs(kappa)<=72"
+      ]
+    ],
+    "static_angle": true
+  },
+  {
+    "name": "non-scanning axis: kappa",
+    "problem": "kappa axis cannot be scanning",
+    "level": 2,
+    "parameter": "scan_ax",
+    "pre_condition": null,
+    "condition": [
+      [
+        "scan_ax!='kappa'"
+      ]
+    ]
+  },
+  {
+    "name": "omega sweep exceeded",
+    "problem": "omega sweep cannot be greater than 120 degrees for non-zero kappa",
+    "level": 3,
+    "parameter": "omega",
+    "pre_condition": [
+      "kappa!=0",
+      "scan_ax=='omega'"
+    ],
+    "condition": [
+      [
+        "sweep<=120"
+      ]
+    ]
+  },
+  {
     "name": "omega sweep exceeded",
     "problem": "omega sweep cannot be greater than 180 degrees for zero kappa",
     "level": 3,
     "parameter": "omega",
-    "pre_condition": ["kappa==0","scan_ax=='omega'"],
-    "condition": [["sweep<=180"]]
-   }, 
-	{
+    "pre_condition": [
+      "kappa==0",
+      "scan_ax=='omega'"
+    ],
+    "condition": [
+      [
+        "sweep<=180"
+      ]
+    ]
+  },
+  {
     "name": "omega position out of range",
-    "problem": "omega position should be in [det_ang_z - 90°, det_ang_z + 90°] range for kappa = 0°",
+    "problem": "omega position should be in [det_ang_z - 90ï¿½, det_ang_z + 90ï¿½] range for kappa = 0ï¿½",
     "level": 4,
     "parameter": "omega",
-    "pre_condition": ["kappa==0"],
-    "condition": [["omega>=-90+det_ang_z", "omega<=90+det_ang_z"]]
-   },
-   {
+    "pre_condition": [
+      "kappa==0"
+    ],
+    "condition": [
+      [
+        "omega>=-90+det_ang_z",
+        "omega<=90+det_ang_z"
+      ]
+    ],
+    "static_angle": true
+  },
+  {
     "name": "omega final position out of range",
-    "problem": "omega final position should be in [det_ang_z - 90°, det_ang_z + 90°] range for kappa = 0°",
+    "problem": "omega final position should be in [det_ang_z - 90ï¿½, det_ang_z + 90ï¿½] range for kappa = 0ï¿½",
     "level": 4,
     "parameter": "omega",
-    "pre_condition": ["kappa==0", "scan_ax=='omega'"],
-    "condition": [["omega+sweep>=-90+det_ang_z", "omega+sweep<=90+det_ang_z", "sweep<=180"]]
-   }, 
-   {
+    "pre_condition": [
+      "kappa==0",
+      "scan_ax=='omega'"
+    ],
+    "condition": [
+      [
+        "omega+sweep>=-90+det_ang_z",
+        "omega+sweep<=90+det_ang_z",
+        "sweep<=180"
+      ]
+    ]
+  },
+  {
     "name": "omega position out of range",
-    "problem": "omega position should be in [det_ang_z - 30°, det_ang_z + 90°] range for kappa < 0°",
+    "problem": "omega position should be in [det_ang_z - 30ï¿½, det_ang_z + 90ï¿½] range for kappa < 0ï¿½",
     "level": 4,
     "parameter": "omega",
-    "pre_condition": ["kappa>0"],
-    "condition": [["omega>=-30+det_ang_z", "omega<=90+det_ang_z"]]
-   },
-   {
+    "pre_condition": [
+      "kappa>0"
+    ],
+    "condition": [
+      [
+        "omega>=-30+det_ang_z",
+        "omega<=90+det_ang_z"
+      ]
+    ],
+    "static_angle": true
+  },
+  {
     "name": "omega final position out of range",
-    "problem": "omega final position should be in [det_ang_z - 30°, det_ang_z + 90°] range for kappa = 0°",
+    "problem": "omega final position should be in [det_ang_z - 30ï¿½, det_ang_z + 90ï¿½] range for kappa = 0ï¿½",
     "level": 4,
     "parameter": "omega",
-    "pre_condition": ["kappa>0", "scan_ax=='omega'"],
-    "condition": [["omega+sweep>=-30+det_ang_z", "omega+sweep<=90+det_ang_z", "sweep<=120"]] 
-   },
-   {
+    "pre_condition": [
+      "kappa>0",
+      "scan_ax=='omega'"
+    ],
+    "condition": [
+      [
+        "omega+sweep>=-30+det_ang_z",
+        "omega+sweep<=90+det_ang_z",
+        "sweep<=120"
+      ]
+    ]
+  },
+  {
     "name": "omega position out of range",
-    "problem": "omega position should be in [det_ang_z - 90°, det_ang_z + 30°] range for kappa > 0°",
+    "problem": "omega position should be in [det_ang_z - 90ï¿½, det_ang_z + 30ï¿½] range for kappa > 0ï¿½",
     "level": 4,
     "parameter": "omega",
-    "pre_condition": ["kappa<0"],
-    "condition": [["omega>=-90+det_ang_z", "omega<=30+det_ang_z"]]
-   },
-   {
+    "pre_condition": [
+      "kappa<0"
+    ],
+    "condition": [
+      [
+        "omega>=-90+det_ang_z",
+        "omega<=30+det_ang_z"
+      ]
+    ],
+    "static_angle": true
+  },
+  {
     "name": "omega final position out of range",
-    "problem": "omega final position should be in [det_ang_z - 90°, det_ang_z + 30°] range for kappa = 0°",
+    "problem": "omega final position should be in [det_ang_z - 90ï¿½, det_ang_z + 30ï¿½] range for kappa = 0ï¿½",
     "level": 4,
     "parameter": "omega",
-    "pre_condition": ["kappa<0", "scan_ax=='omega'"],
-    "condition": [["omega+sweep>=-30+det_ang_z", "omega+sweep<90+det_ang_z", "sweep<=120"]]
-   }
+    "pre_condition": [
+      "kappa<0",
+      "scan_ax=='omega'"
+    ],
+    "condition": [
+      [
+        "omega+sweep>=-30+det_ang_z",
+        "omega+sweep<90+det_ang_z",
+        "sweep<=120"
+      ]
+    ]
+  }
 ]

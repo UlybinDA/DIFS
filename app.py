@@ -2911,13 +2911,16 @@ def calculate_diff_map(n_clicks, map_type, data_container, det_data):
                        'orientation': det_data['orientation'],
                        'disp_y': det_data['disp_y'],
                        'disp_z': det_data['disp_z']}
-            fig = exp1.generate_diffraction_map_3d(reflections=reflections,yxz_rotations=yxz_axes,
-                                                   xz_steps=(step_x,step_z),xz_ranges=(range_x,range_z),
-                                                   factor_detector=True,det_prm=det_prm,initial_angles=angles)
+            fig = exp1.generate_diffraction_map_3d(reflections=reflections, yxz_rotations=yxz_axes,
+                                                   xz_steps=(step_x, step_z), xz_ranges=(range_x, range_z),
+                                                   factor_detector=True, det_prm=det_prm, initial_angles=angles,
+                                                   check_collisions=det_data['factor_collision'],
+                                                   factor_obstacles=det_data['factor_obstacles'])
         else:
             fig = exp1.generate_diffraction_map_3d(reflections=reflections, yxz_rotations=yxz_axes,
                                                    xz_steps=(step_x, step_z), xz_ranges=(range_x, range_z),
-                                                   initial_angles=angles)
+                                                   initial_angles=angles, check_collisions=det_data['factor_collision'],
+                                                   factor_obstacles=det_data['factor_obstacles'])
         return fig, '3d map'
 
 
@@ -2996,7 +2999,6 @@ def generate_angle_table(id_, style, style_cell):
         style=style
     )
     return input_angles_table
-
 
 
 @callback(

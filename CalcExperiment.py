@@ -309,20 +309,186 @@ class Experiment:
                                     check_collisions=False, factor_detector=False, factor_obstacles=True, det_prm=None):
         detector = None
         obstacles = None
+        x_vals, z_vals = sf.prepare_xy_grid_flatten(xy_ranges=xz_ranges, xy_steps=xz_steps)
+
         if factor_detector:
             assert self.det_geometry, 'No detector model, to factor in'
             detector = Ray_obstacle(dist=det_prm['dist'], rot=det_prm['rot'], orientation=det_prm['orientation'],
                                     geometry=self.det_geometry, height=self.det_height, width=self.det_width,
                                     complex=self.det_complex, complex_format=self.det_complex_format,
-                                    diameter=self.det_diameter,disp_y=det_prm['disp_y'],disp_z=det_prm['disp_z'])
+                                    diameter=self.det_diameter, disp_y=det_prm['disp_y'], disp_z=det_prm['disp_z'])
         if factor_obstacles:
             obstacles = self.obstacles
 
-        names = tuple(self.axes_names[i] for i in yxz_rotations)
-        fig = self.cell.mapv2(reflections=reflections, yxz_rotations=yxz_rotations, directions=self.axes_directions,
-                              angles=initial_angles, xz_steps=xz_steps, xz_ranges=xz_ranges, wavelength=self.wavelength,
-                              yxz_names=names, obstacles=obstacles, detector=detector, visualise=False,all_rotations=self.axes_rotations)
+        if check_collisions and self.logic_collision:
+            names = [self.axes_names[i] for i in yxz_rotations[1:]]
+            bool_mask = self.generate_boolean_mask_collision_scheme(angles=(x_vals, z_vals), names=names,
+                                                                    initial_angles=initial_angles, detector=detector)
+            x_vals = x_vals[bool_mask]
+            z_vals = z_vals[bool_mask]
+
+        diff_vecs_array, anglesy, hkl_array, anglesx, anglesz = self.cell.mapv2(reflections=reflections,
+                                                                                yxz_rotations=yxz_rotations,
+                                                                                directions=self.axes_directions,
+                                                                                angles=initial_angles, z_values=z_vals,
+                                                                                x_values=x_vals,
+                                                                                wavelength=self.wavelength,
+                                                                                obstacles=obstacles, detector=detector,
+                                                                                all_rotations=self.axes_rotations)
+        names = [self.axes_names[i] for i in yxz_rotations]
+        anglesy = np.rad2deg(anglesy)
+        if check_collisions:
+            bool_mask = self.generate_boolean_mask_collision_scheme(
+                angles=(anglesy.copy(), anglesx.reshape(-1), anglesz.reshape(-1)),
+                names=names, initial_angles=initial_angles,
+                detector=detector)
+            anglesx = anglesx[bool_mask.reshape(-1,1)[:,0]]
+            anglesz = anglesz[bool_mask.reshape(-1,1)[:,0]]
+            anglesy = anglesy[bool_mask.reshape(-1,1)[:,0]]
+            diff_vecs_array = diff_vecs_array[bool_mask.reshape(-1,1)[:,0]]
+            hkl_array = hkl_array[bool_mask.reshape(-1,1)[:,0]]
+        data_in = (diff_vecs_array, anglesy, hkl_array, anglesx, anglesz)
+        fig = self._prepare_fig_3d_diff_map(data_in=data_in,detector=detector,obstacles=obstacles,yxz_names=names)
         return fig
+
+    def _prepare_fig_3d_diff_map(self,data_in,detector,obstacles,yxz_names):
+        data_out = [(np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 3),
+                     np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 1))]
+        if detector:
+            data = detector.filter(diff_vecs=data_in[0], data=data_in, mode='separate')
+            data_in = [i for i in data[::2]]
+            data_ = [i for i in data[1::2]]
+            data_out.append(data_)
+
+        if obstacles:
+            for obstacle in obstacles:
+                data = obstacle.filter(diff_vecs=data_in[0], data=data_in, mode='separate')
+                data_in = [i for i in data[::2]]
+                data_ = [i for i in data[1::2]]
+                data_out.append(data_)
+
+        if len(data_out) >= 2:
+            for i in range(len(data_out)):
+                if i == 0:
+                    vals = data_out[i]
+                    tmp_container = [[j] for j in vals]
+                else:
+                    for n, j in enumerate(data_out[i]):
+                        tmp_container[n].append(j)
+            data_out = [np.vstack(i) for i in tmp_container]
+        else:
+            data_out = (np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 3),
+                        np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 1))
+
+        diff_vecs_array_i, diff_angles_array_i, hkl_array_i, anglesx_i, anglesz_i = data_in
+        diff_vecs_array_o, diff_angles_array_o, hkl_array_o, anglesx_o, anglesz_o = data_out
+
+
+        x_all = np.concatenate([anglesx_i, anglesx_o])
+        y_all = np.concatenate([diff_angles_array_i, diff_angles_array_o])
+        z_all = np.concatenate([anglesz_i, anglesz_o])
+        hkl_str_i = sf.hkl_to_str(hkl_array_i.astype(int))
+        hkl_str_o = sf.hkl_to_str(hkl_array_o.astype(int))
+        hkl_str_i = hkl_str_i.reshape(-1, 1) if hkl_str_i.ndim == 1 else hkl_str_i
+        hkl_str_o = hkl_str_o.reshape(-1, 1) if hkl_str_o.ndim == 1 else hkl_str_o
+
+        mask_in = np.array([*([1, ] * len(hkl_str_i)), *([0, ] * len(hkl_str_o))]).astype(bool).reshape(-1, 1)
+        hkl_str_all = np.vstack((hkl_str_i, hkl_str_o))
+        x_all_flat = x_all.reshape(-1)
+        y_all_flat = y_all.reshape(-1)
+        z_all_flat = z_all.reshape(-1)
+        hkl_str_all_flat = hkl_str_all.reshape(-1)
+        mask_in_flat = mask_in.reshape(-1).astype(bool)
+
+        unique_hkl_i = np.unique(hkl_str_i)
+
+        unique_hkl_all = np.unique(hkl_str_all_flat)
+
+        color_map = {
+            hkl: color
+            for hkl, color in zip(
+                unique_hkl_i,
+                sf.generate_random_hex_colors(len(unique_hkl_i))
+            )
+        }
+        fig = go.Figure()
+
+        for hkl in unique_hkl_all:
+            hkl_mask = (hkl_str_all_flat == hkl)
+
+            x_hkl = x_all_flat[hkl_mask].tolist()
+            y_hkl = y_all_flat[hkl_mask].tolist()
+            z_hkl = z_all_flat[hkl_mask].tolist()
+            mask_in_hkl = mask_in_flat[hkl_mask].tolist()
+
+            colors = [
+                color_map.get(hkl, '#808080') if is_in else '#FF0000'
+                for is_in in mask_in_hkl
+            ]
+
+            sizes = [4.0 if is_in else 2.0 for is_in in mask_in_hkl]
+
+            fig.add_trace(go.Scatter3d(
+                x=x_hkl,
+                y=y_hkl,
+                z=z_hkl,
+                mode='markers',
+                name=hkl,
+                marker=dict(
+                    size=sizes,
+                    color=colors,
+                    opacity=0.8
+                ),
+                legendgroup=hkl,
+                showlegend=True
+            ))
+
+        fig.update_layout(scene_camera=dict(projection=dict(type='orthographic')))
+        fig.update_layout(
+            scene=dict(
+                xaxis_title=yxz_names[1],
+                yaxis_title=yxz_names[0],
+                zaxis_title=yxz_names[2]
+            )
+        )
+
+        return fig
+
+    @mylogger('DEBUG',log_args=True)
+    def generate_boolean_mask_collision_scheme(self, angles, names, initial_angles, detector):
+        if detector:
+            detector_dict = {'d_dist': detector.dist, 'det_ang_x': detector.rot[0], 'det_ang_y': detector.rot[1],
+                             'det_ang_z': detector.rot[2], 'det_orient': detector.orientation,
+                             'det_disp_y': detector.disp_y, 'det_disp_z': detector.disp_z}
+        else:
+            detector_dict = {}
+
+        angles_dict = dict(zip(self.axes_names, initial_angles))
+        for angles_, name in zip(angles, names):
+            angles_dict[name] = angles_
+        print(angles_dict)
+        additional_operations = {'abs': abs}
+        variables_dict = {**detector_dict, **angles_dict, **additional_operations}
+        collisions = [i for i in self.logic_collision if i.get('static_angle', False)]
+
+        overall_mask = True
+        for n_block, block in enumerate(collisions):
+            try:
+                if (not block['pre_condition'] or
+                        all(sf.logic_eval(check, variables_dict) for check in block['pre_condition'])):
+                    block_bool_mask = True
+                    for subblock in block['condition']:
+                        subblock_bool_mask = True
+                        for check in subblock:
+                            try:
+                                check_mask = sf.logic_eval(check, variables_dict)
+                                subblock_bool_mask &= check_mask
+                            except:
+                                subblock_bool_mask &= True
+                        block_bool_mask &= subblock_bool_mask
+                    overall_mask &= block_bool_mask
+            except: overall_mask &= True
+        return overall_mask
 
     def separate_unique_common(self):
         assert len(self.strategy_data_container.scan_data_containers) >= 2, 'Provide at least 2 scan'
@@ -629,7 +795,7 @@ class Experiment:
             angles_dict = dict(zip(self.axes_names, scan[3]))
             variables_dict = {'d_dist': scan[0], 'det_ang_x': scan[1][0], 'det_ang_y': scan[1][1],
                               'det_ang_z': scan[1][2], 'det_orient': scan[2],
-                              'scan_ax': scan_name, 'sweep': scan[5], 'det_d_y': scan[6], 'det_d_z': scan[7]}
+                              'scan_ax': scan_name, 'sweep': scan[5], 'det_disp_y': scan[6], 'det_disp_z': scan[7]}
             variables_dict = {**variables_dict, **angles_dict, **additional_operations}
             for n_block, block in enumerate(self.logic_collision):
                 if (not block['pre_condition'] or

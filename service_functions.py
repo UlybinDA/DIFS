@@ -1183,9 +1183,11 @@ def logic_eval(string_expression: str, variables: Dict[str, Any] = {}) -> bool:
         if name not in variables:
             raise NameError(f"Usage of {name} is not allowed.")
     result = eval(code, {"__builtins__": {}}, variables)
-    if not type(result) == bool:
-        raise TypeError(f"Result of expression sould be bool, not {type(result)}")
-    return result
+    if (isinstance(result, (bool, np.bool_)) or
+            (isinstance(result, np.ndarray) and result.dtype == bool)):
+        return result
+    else:
+        raise TypeError(f"Result of expression should be bool or logic ndarray, not {type(result)}")
 
 
 def parse_p4p_for_UB(str_data: str) -> Optional[np.ndarray]:
@@ -1534,7 +1536,7 @@ def process_runs_to_dicts_list(runs: List[List[Any]]) -> List[Dict[str, Any]]:
 
 def check_run_dict_temp(run: Dict[str, Any]) -> None:
     if any((run['det_dist'] == '', run['det_angles'][0] == '', run['det_angles'][1] == '', run['det_angles'][2] == ''
-            , run['det_orientation'] == '', run['scan'] == '', run['scan'] == '', run['sweep'] == '',
+                , run['det_orientation'] == '', run['scan'] == '', run['scan'] == '', run['sweep'] == '',
             run['sweep'] == 0)):
         raise RunsDictError(add_runs_empty_error)
     if any([angle == '' for angle in run['axes_angles']]):
@@ -1692,8 +1694,8 @@ class CumulativeDataCalculator:
 
     def set_d_roi(self, roi):
         if roi is None:
-            self.d_low=None
-            self.d_high=None
+            self.d_low = None
+            self.d_high = None
         else:
             self.d_low = min(roi)
             self.d_high = max(roi)
@@ -1975,7 +1977,7 @@ def cumulative_dag_row_data_processing(dag_data):
 
     for run_data in dag_data:
         for key in output_data:
-            if key not in ('selected','run n','run_order'):
+            if key not in ('selected', 'run n', 'run_order'):
                 output_data[key].append(float(run_data[key]))
             else:
                 output_data[key].append(run_data[key])
@@ -2008,6 +2010,7 @@ def cumulative_dag_row_data_processing(dag_data):
         raise CalcCumulativeCompletenessError(modal_tuple_)
 
     return output_data
+
 
 def generate_rowdata_cumulative_ag(exp_inst):
     sweeps = []
@@ -2052,7 +2055,7 @@ def generate_rowdata_cumulative_ag(exp_inst):
     return df.to_dict("records")
 
 
-def process_d_range(exp_inst,d_range):
+def process_d_range(exp_inst, d_range):
     low_workaround = 0.0
     high_workaround = 9999.0
 
@@ -2070,7 +2073,7 @@ def process_d_range(exp_inst,d_range):
     return dmin, dmax
 
 
-def update_data_container(exp_inst,input_parameters, dag_length):
+def update_data_container(exp_inst, input_parameters, dag_length):
     for i in range(dag_length):
         run_n = input_parameters['run n'][i]
 
@@ -2103,10 +2106,30 @@ def update_completeness_data(dag_data, completeness):
     return dag_data
 
 
+def prepare_xy_grid_flatten(xy_ranges, xy_steps):
+    x_range = np.arange(xy_ranges[0][0], xy_ranges[0][1], xy_steps[0])
+    y_range = np.arange(xy_ranges[1][0], xy_ranges[1][1], xy_steps[1])
+    x_range_new, y_range_new = np.meshgrid(x_range, y_range)
+    return x_range_new.reshape(-1), y_range_new.reshape(-1)
 
 
+def hkl_to_str(hkl_array):
+    hkl_str = np.char.add(np.char.add(hkl_array[:, 0].astype(str), ' '),
+                          np.char.add(hkl_array[:, 1].astype(str), ' '))
+    hkl_str = np.char.add(hkl_str, hkl_array[:, 2].astype(str))
+
+    return hkl_str
 
 
+def generate_random_hex_colors(num_colors):
+    hex_colors = []
+    for _ in range(num_colors):
+        r = random.randint(0, 255)
+        g = random.randint(0, 255)
+        b = random.randint(0, 255)
+        hex_color = "#{:06x}".format(r << 16 | g << 8 | b)
+        hex_colors.append(hex_color)
+    return hex_colors
 
 
 if __name__ == '__main__':

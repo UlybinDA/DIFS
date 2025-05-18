@@ -627,8 +627,24 @@ def get_diff_map_detector(id_):
             },
             columnDefs=[
                 {
+                    "field": "factor_collision",
+                    "headerName": "Acc. collision",
+                    "editable": True,
+                    "width": 100,
+                    "cellRenderer": "agCheckboxCellRenderer",
+                    "cellEditor": "agCheckboxCellEditor",
+                },
+                {
+                    "field": "factor_obstacles",
+                    "headerName": "Acc. obstacles",
+                    "editable": True,
+                    "width": 100,
+                    "cellRenderer": "agCheckboxCellRenderer",
+                    "cellEditor": "agCheckboxCellEditor",
+                },
+                {
                     "field": "factor_detector",
-                    "headerName": "account",
+                    "headerName": "Acc. detector",
                     "editable": True,
                     "width": 100,
                     "cellRenderer": "agCheckboxCellRenderer",
