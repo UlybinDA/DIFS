@@ -178,8 +178,7 @@ class Experiment:
             pass
         if d_range and hkl_section is None:
 
-            self.hkl_in_d_range, self.hkl_origin_in_d_range = self.cell.gen_hkl_arrays(type='d_range',
-                                                                                       d_range=d_range,
+            self.hkl_in_d_range, self.hkl_origin_in_d_range = self.cell.gen_hkl_arrays(type='d_range', d_range=d_range,
                                                                                        return_origin=True,
                                                                                        pg=self.pg,
                                                                                        centring=self.centring)
@@ -252,10 +251,7 @@ class Experiment:
 
             if hasattr(self, 'obstacles') and self.obstacles != list():
                 for obstacle in self.obstacles:
-                    obstacle_ = Ray_obstacle(dist=obstacle[0], geometry=obstacle[1], orientation=obstacle[2],
-                                             rot=obstacle[8], disp_y=obstacle[3], disp_z=obstacle[4],
-                                             height=obstacle[5],
-                                             width=obstacle[6], diameter=obstacle[7])
+                    obstacle_ = self._create_obstacle(obstacle)
                     data = obstacle_.filter(diff_vecs=data[0], data=data, mode='shade')
             scan_container = sf.ScanDataContainer(diff_vecs=data[0], hkl=data[1], hkl_origin=data[2],
                                                   diff_angles=data[3],
@@ -272,6 +268,13 @@ class Experiment:
             delattr(self, 'known_hkl_orig')
         return True, None
 
+    def _create_obstacle(self, obstacle_data):
+        obstacle_ = Ray_obstacle(dist=obstacle_data[0], geometry=obstacle_data[1], orientation=obstacle_data[2],
+                                 rot=obstacle_data[8], disp_y=obstacle_data[3], disp_z=obstacle_data[4],
+                                 height=obstacle_data[5],
+                                 width=obstacle_data[6], diameter=obstacle_data[7])
+        return obstacle_
+
     def load_hkls(self, hkl_str_list, pg=None, centring=None):
         self.strategy_data_container.clear_data()
         if pg is None: pg = self.pg
@@ -284,7 +287,6 @@ class Experiment:
             d_max_ = max(d_array)
             hkl_array_orig = sf.generate_original_hkl_for_hkl_array(hkl_array, pg=pg, parameters=self.parameters,
                                                                     centring=centring)
-
             sdc = sf.ScanDataContainer(diff_vecs=None, hkl=hkl_array, hkl_origin=hkl_array_orig, diff_angles=None,
                                        scan_setup=None, start_angle=None, sweep=None)
             self.strategy_data_container.add_scan_data_container(sdc)
@@ -308,7 +310,7 @@ class Experiment:
     def generate_diffraction_map_3d(self, reflections, yxz_rotations, initial_angles, xz_steps, xz_ranges,
                                     check_collisions=False, factor_detector=False, factor_obstacles=True, det_prm=None):
         detector = None
-        obstacles = None
+        obstacles = []
         x_vals, z_vals = sf.prepare_xy_grid_flatten(xy_ranges=xz_ranges, xy_steps=xz_steps)
 
         if factor_detector:
@@ -317,8 +319,11 @@ class Experiment:
                                     geometry=self.det_geometry, height=self.det_height, width=self.det_width,
                                     complex=self.det_complex, complex_format=self.det_complex_format,
                                     diameter=self.det_diameter, disp_y=det_prm['disp_y'], disp_z=det_prm['disp_z'])
-        if factor_obstacles:
-            obstacles = self.obstacles
+
+        if factor_obstacles and hasattr(self, 'obstacles') and self.obstacles != list():
+            for obstacle in self.obstacles:
+                obstacle_ = self._create_obstacle(obstacle)
+                obstacles.append(obstacle_)
 
         if check_collisions and self.logic_collision:
             names = [self.axes_names[i] for i in yxz_rotations[1:]]
@@ -342,16 +347,16 @@ class Experiment:
                 angles=(anglesy.copy(), anglesx.reshape(-1), anglesz.reshape(-1)),
                 names=names, initial_angles=initial_angles,
                 detector=detector)
-            anglesx = anglesx[bool_mask.reshape(-1,1)[:,0]]
-            anglesz = anglesz[bool_mask.reshape(-1,1)[:,0]]
-            anglesy = anglesy[bool_mask.reshape(-1,1)[:,0]]
-            diff_vecs_array = diff_vecs_array[bool_mask.reshape(-1,1)[:,0]]
-            hkl_array = hkl_array[bool_mask.reshape(-1,1)[:,0]]
+            anglesx = anglesx[bool_mask.reshape(-1, 1)[:, 0]]
+            anglesz = anglesz[bool_mask.reshape(-1, 1)[:, 0]]
+            anglesy = anglesy[bool_mask.reshape(-1, 1)[:, 0]]
+            diff_vecs_array = diff_vecs_array[bool_mask.reshape(-1, 1)[:, 0]]
+            hkl_array = hkl_array[bool_mask.reshape(-1, 1)[:, 0]]
         data_in = (diff_vecs_array, anglesy, hkl_array, anglesx, anglesz)
-        fig = self._prepare_fig_3d_diff_map(data_in=data_in,detector=detector,obstacles=obstacles,yxz_names=names)
+        fig = self._prepare_fig_3d_diff_map(data_in=data_in, detector=detector, obstacles=obstacles, yxz_names=names)
         return fig
 
-    def _prepare_fig_3d_diff_map(self,data_in,detector,obstacles,yxz_names):
+    def _prepare_fig_3d_diff_map(self, data_in, detector, obstacles, yxz_names):
         data_out = [(np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 3),
                      np.array([]).reshape(-1, 1), np.array([]).reshape(-1, 1))]
         if detector:
@@ -382,7 +387,6 @@ class Experiment:
 
         diff_vecs_array_i, diff_angles_array_i, hkl_array_i, anglesx_i, anglesz_i = data_in
         diff_vecs_array_o, diff_angles_array_o, hkl_array_o, anglesx_o, anglesz_o = data_out
-
 
         x_all = np.concatenate([anglesx_i, anglesx_o])
         y_all = np.concatenate([diff_angles_array_i, diff_angles_array_o])
@@ -454,7 +458,7 @@ class Experiment:
 
         return fig
 
-    @mylogger('DEBUG',log_args=True)
+    @mylogger('DEBUG', log_args=True)
     def generate_boolean_mask_collision_scheme(self, angles, names, initial_angles, detector):
         if detector:
             detector_dict = {'d_dist': detector.dist, 'det_ang_x': detector.rot[0], 'det_ang_y': detector.rot[1],
@@ -487,7 +491,8 @@ class Experiment:
                                 subblock_bool_mask &= True
                         block_bool_mask &= subblock_bool_mask
                     overall_mask &= block_bool_mask
-            except: overall_mask &= True
+            except:
+                overall_mask &= True
         return overall_mask
 
     def separate_unique_common(self):

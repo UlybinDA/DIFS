@@ -1835,7 +1835,7 @@ class CumulativeDataCalculator:
             if not run_data['ommited']:
                 bool_mask = self.gen_bool_mask(run_data=run_data)
                 hkl_original = run_data['hkl_origin_e'][bool_mask].reshape(-1)
-                completeness = self.calc_completeness(base_hkl=hkl_original_base, hkl=run_data['hkl_origin_e'])
+                completeness = self.calc_completeness(base_hkl=hkl_original_base, hkl=hkl_original)
                 return completeness, index, hkl_original
 
     def shuffle_dict_by_permutation(self, original_dict, permutation):
@@ -2072,7 +2072,7 @@ def process_d_range(exp_inst, d_range):
 
     return dmin, dmax
 
-
+@mylogger('DEBUG',log_args=True)
 def update_data_container(exp_inst, input_parameters, dag_length):
     for i in range(dag_length):
         run_n = input_parameters['run n'][i]
