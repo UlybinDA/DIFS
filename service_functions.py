@@ -1227,7 +1227,7 @@ def parse_par_for_UB(str_data: str, to_angstroms: bool = True) -> Optional[np.nd
         ub_components = [float(i) for i in ub_components]
         ub_matrix = np.array(ub_components).reshape(3, 3)
         if to_angstroms: ub_matrix /= wavelength
-        esp_to_brk_rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        esp_to_brk_rotation = np.array([[-1, 0, 0], [0, -1, 0], [0, 0, 1]])
         ub_matrix = np.matmul(esp_to_brk_rotation, ub_matrix)
         return ub_matrix
     except:
