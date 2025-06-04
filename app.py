@@ -2892,7 +2892,6 @@ def calculate_diff_map(n_clicks, map_type, data_container, det_data):
     axes_data = data_container['props']['children'][0]['props']['children']['props']['data'][0]
     angles_data = data_container['props']['children'][1]['props']['children']['props']['data'][0]
     range_step_data = data_container['props']['children'][2]['props']['children']['props']['data'][0]
-
     if map_type == '3d map':
         N_OF_RAND_REF = 20
         selected_n = selected_reflections.shape[0]
@@ -2932,14 +2931,27 @@ def calculate_diff_map(n_clicks, map_type, data_container, det_data):
         else:
             np.random.shuffle(selected_reflections)
             reflections = selected_reflections[: N_OF_RAND_REF, :3]
+
         yx_axes = (axes_data['y_axis'], axes_data['x_axis'])
         angles = list(angles_data.values())
         range_x, step_x = [(range_step_data['x_min'], range_step_data['x_max']), range_step_data['x_step']]
-        names = (exp1.axes_names[yx_axes[0]], exp1.axes_names[yx_axes[1]])
-        fig = exp1.cell.map_2d(reflections, rotations=exp1.axes_rotations, angles=angles,
-                               directions=exp1.axes_directions, rotation_directions=yx_axes, step=step_x,
-                               range_x=range_x, wavelength=exp1.wavelength,
-                               names=names, visualise=False)
+        if det_data['factor_detector']:
+            det_prm = {'dist': det_data['d_dist'],
+                       'rot': (det_data['rot_x'], det_data['rot_y'], det_data['rot_z']),
+                       'orientation': det_data['orientation'],
+                       'disp_y': det_data['disp_y'],
+                       'disp_z': det_data['disp_z']}
+            fig = exp1.generate_diffraction_map_2d(reflections=reflections, yx_rotations=yx_axes,
+                                                   x_step=step_x, x_range=range_x,
+                                                   factor_detector=True, det_prm=det_prm, initial_angles=angles,
+                                                   check_collisions=det_data['factor_collision'],
+                                                   factor_obstacles=det_data['factor_obstacles'])
+        else:
+            fig = exp1.generate_diffraction_map_2d(reflections=reflections, yx_rotations=yx_axes,
+                                                   x_step=step_x, x_range=range_x,
+                                                   factor_detector=False, initial_angles=angles,
+                                                   check_collisions=det_data['factor_collision'],
+                                                   factor_obstacles=det_data['factor_obstacles'])
         return fig, '2d map'
 
     elif map_type == '1d map':

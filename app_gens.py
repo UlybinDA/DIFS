@@ -602,6 +602,8 @@ def get_range_dag(id_):
 @mylogger('DEBUG',log_args=True)
 def get_diff_map_detector(id_):
     df = pd.DataFrame({
+        'factor_collision': [False],
+        'factor_obstacles': [False],
         'factor_detector': [False],
         'd_dist': [40],
         'rot_x': [0],

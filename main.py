@@ -1209,12 +1209,7 @@ class Sample():
               x_values: np.ndarray,
               z_values: np.ndarray,
               wavelength: float,
-              obstacles=None,
-              detector=None,
               ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray,]:
-        assert detector is None or isinstance(detector, Ray_obstacle), 'Wrong detector format'
-        assert obstacles is None or all(
-            isinstance(obstacle, Ray_obstacle) for obstacle in obstacles), 'Wrong obstacle format'
         angles_ = list(angles)
         diffraction_vecs_list = []
         diffraction_angles_list = []
@@ -1244,6 +1239,41 @@ class Sample():
         anglesz = np.vstack(anglesz_list)
         data_in = (diff_vecs_array, diff_angles_array, hkl_array, anglesx, anglesz)
         return data_in
+
+    def map_2d_v2(self,
+              reflections: np.ndarray,
+              directions: Tuple[int],
+              angles: Tuple[float],
+              all_rotations: Tuple[str],
+              yx_rotations: Tuple[int],
+              x_values: np.ndarray,
+              wavelength: float,
+              ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        angles_ = list(angles)
+        diffraction_vecs_list = []
+        diffraction_angles_list = []
+        hkl_list = []
+        anglesx_list = []
+        for anglex in x_values:
+            angles_[yx_rotations[1]] = anglex
+
+            diff_vecs, hkl_array, _, angles_array = self.scan(scan_type='???', scan_sweep=360, rotations=all_rotations,
+                                                              angles=angles_, directions=directions,
+                                                              no_of_scan=yx_rotations[0],
+                                                              hkl_array=reflections, hkl_array_orig=reflections,
+                                                              wavelength=wavelength)
+            diffraction_vecs_list.append(diff_vecs)
+            diffraction_angles_list.append(angles_array)
+            hkl_list.append(hkl_array)
+            n_data = diff_vecs.shape[0]
+            anglesx_list.append(np.full(n_data, anglex).reshape(-1, 1))
+        diff_vecs_array = np.vstack(diffraction_vecs_list)
+        diff_angles_array = np.vstack(diffraction_angles_list)
+        hkl_array = np.vstack(hkl_list)
+        anglesx = np.vstack(anglesx_list)
+        data_in = (diff_vecs_array, diff_angles_array, hkl_array, anglesx)
+        return data_in
+
 
     def map_2d(self,
                reflections: np.ndarray,
