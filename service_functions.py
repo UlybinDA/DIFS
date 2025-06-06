@@ -66,15 +66,13 @@ def cut_by_d(hkl_array: np.ndarray, d_range: List[float], parameters: List[float
 
 
 def generate_original_hkl_for_hkl_array(hkl_array: np.ndarray, pg: str, parameters: List[float],
-                                        d_range: Optional[List[float]] = None, centring: str = 'P') -> np.ndarray:
-    if not d_range:
-        d_array = create_d_array(parameters=parameters, hkl_array=hkl_array)
-        d_range = [min(d_array), max(d_array)]
+                                         centring: str = 'P') -> np.ndarray:
+    d_array = create_d_array(parameters=parameters, hkl_array=hkl_array)
+    d_range = (min(d_array), max(d_array))
     sample = Sample(a=parameters[0], b=parameters[1], c=parameters[2], al=parameters[3], bt=parameters[4],
                     gm=parameters[5])
     hkl_array_, hkl_array_orig = sample.gen_hkl_arrays(type='d_range', d_range=d_range, return_origin=True, pg=pg,
                                                        centring=centring)
-
     generated_hkl_encoded_array = encode_hkl(hkl_array_)
     hkl_encoded_array = encode_hkl(hkl_array)
     sort_idx = np.argsort(generated_hkl_encoded_array)
@@ -678,24 +676,34 @@ def generate_redundancy_plot(hkl: np.ndarray, all_hkl_orig: np.ndarray, paramete
 
 
 def create_d_array(parameters: List[float], hkl_array: np.ndarray) -> np.ndarray:
-    cell_vol = parameters[0] * parameters[1] * parameters[2] * (1 - np.cos(np.deg2rad(parameters[3])) ** 2 - np.cos(
-        np.deg2rad(parameters[4])) ** 2 - np.cos(np.deg2rad(parameters[5])) ** 2 + 2 * np.cos(
-        np.deg2rad(parameters[3])) * np.cos(np.deg2rad(parameters[3])) * np.cos(np.deg2rad(parameters[3]))) ** 0.5
-    a = parameters[0]
-    b = parameters[1]
-    c = parameters[2]
-    al = np.deg2rad(parameters[3])
-    bt = np.deg2rad(parameters[4])
-    gm = np.deg2rad(parameters[5])
-    d_array = cell_vol / (hkl_array[:, 0] ** 2 * b ** 2 * c ** 2 * np.sin(al) ** 2 + hkl_array[:,
-                                                                                     1] ** 2 * a ** 2 * c ** 2 * np.sin(
-        bt) ** 2 + hkl_array[:, 2] ** 2 * a ** 2 * b ** 2 * np.sin(gm) ** 2 +
-                          2 * hkl_array[:, 0] * hkl_array[:, 1] * a * b * c ** 2 * (
-                                  np.cos(al) * np.cos(bt) - np.cos(gm)) + 2 *
-                          hkl_array[:, 2] * hkl_array[:, 1] * a ** 2 * b * c * (
-                                  np.cos(gm) * np.cos(bt) - np.cos(al)) + 2 *
-                          hkl_array[:, 0] * hkl_array[:, 2] * a * b ** 2 * c * (
-                                  np.cos(al) * np.cos(gm) - np.cos(bt))) ** 0.5
+    a, b, c, alpha_deg, beta_deg, gamma_deg = [float(p) for p in parameters]
+
+    alpha = np.deg2rad(alpha_deg)
+    beta = np.deg2rad(beta_deg)
+    gamma = np.deg2rad(gamma_deg)
+
+    cos_a = np.cos(alpha)
+    cos_b = np.cos(beta)
+    cos_g = np.cos(gamma)
+    sqrt_term = 1 - cos_a ** 2 - cos_b ** 2 - cos_g ** 2 + 2 * cos_a * cos_b * cos_g
+    cell_vol = a * b * c * np.sqrt(sqrt_term)
+
+    sin_a = np.sin(alpha)
+    sin_b = np.sin(beta)
+    sin_g = np.sin(gamma)
+
+    h, k, l = hkl_array[:, 0], hkl_array[:, 1], hkl_array[:, 2]
+
+    denominator = (
+            h ** 2 * b ** 2 * c ** 2 * sin_a ** 2 +
+            k ** 2 * a ** 2 * c ** 2 * sin_b ** 2 +
+            l ** 2 * a ** 2 * b ** 2 * sin_g ** 2 +
+            2 * h * k * a * b * c ** 2 * (cos_a * cos_b - cos_g) +
+            2 * k * l * a ** 2 * b * c * (cos_b * cos_g - cos_a) +
+            2 * h * l * a * b ** 2 * c * (cos_a * cos_g - cos_b)
+    )
+
+    d_array = cell_vol / np.sqrt(denominator)
     return d_array
 
 

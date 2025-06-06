@@ -975,7 +975,7 @@ class Sample():
     def create_d_array(parameters: np.ndarray,
                        cell_vol: float,
                        hkl_array: np.ndarray) -> np.ndarray:
-
+        parameters = [float(parameter) for parameter in parameters]
         a = parameters[0]
         b = parameters[1]
         c = parameters[2]

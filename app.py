@@ -885,7 +885,7 @@ fourth_page = html.Div([
             'margin-left': '1vw',
             'margin-top': '3vw',
             'width': '100px'},
-        id='upload_hkl', accept='.hkl', multiple=True, max_size=1_000_000
+        id='upload_hkl', accept='.hkl', multiple=True, max_size=1_000_000_00
     ),
     html.Div([
         html.H5('Completeness %'),
