@@ -11,6 +11,8 @@ from my_logger import mylogger
 import plotly.graph_objs as go
 from typing import Optional, List, Tuple, Dict, Any, Union, Callable
 from plotly.subplots import make_subplots
+import plotly.express as px
+from encode_hkl import encode_hkl
 
 
 class Experiment:
@@ -350,6 +352,22 @@ class Experiment:
 
         return x_all.ravel(), y_all.ravel(), z_all.ravel(), hkl_str_all, mask_in
 
+    def _prepare_plot_1d_data(self, data_in, data_out):
+        diff_vecs_i, diff_angles_i, hkl_i, hkl_orig_i = data_in
+        diff_vecs_o, diff_angles_o, hkl_o, hkl_orig_o = data_out
+        x_all = np.concatenate([diff_angles_i, diff_angles_o])
+
+        hkl_encoded_i = encode_hkl(hkl_i.astype(int))
+        hkl_encoded_o = encode_hkl(hkl_o.astype(int))
+
+        hkl_orig_encoded_i = encode_hkl(hkl_orig_i.astype(int))
+        hkl_orig_encoded_o = encode_hkl(hkl_orig_o.astype(int))
+
+        mask_in = np.array([*([True] * len(hkl_encoded_i)), *([False] * len(hkl_encoded_o))])
+        hkl_encoded_all = np.vstack((hkl_encoded_i, hkl_encoded_o)).ravel()
+        hkl_orig_encoded_all = np.vstack((hkl_orig_encoded_i, hkl_orig_encoded_o)).ravel()
+        return x_all.ravel(), hkl_encoded_all, hkl_orig_encoded_all, mask_in
+
     def _prepare_plot_2d_data(self, data_in, data_out):
         diff_vecs_i, diff_angles_i, hkl_i, anglesx_i = data_in
         diff_vecs_o, diff_angles_o, hkl_o, anglesx_o = data_out
@@ -375,6 +393,20 @@ class Experiment:
                 unique_hkl_i,
                 sf.generate_random_hex_colors(len(unique_hkl_i)))
         }
+
+    def _create_1d_figure(self, x, hkl_encoded_all, hkl_orig_encoded_all, mask_in, name):
+        x_in = x[mask_in]
+        hkl_encoded_in = hkl_encoded_all[mask_in]
+        hkl_orig_encoded_in = hkl_orig_encoded_all[mask_in]
+        hkl_arrays = np.stack((hkl_encoded_in, hkl_orig_encoded_in))
+        fig = go.Figure()
+        fig.add_trace(go.Histogram(x=x_in, name='hkl registered', nbinsx=360, marker=dict(color='rgb(98, 155, 255)'),
+                                   customdata=hkl_arrays))
+        fig.add_trace(go.Histogram(x=x, name='hkl all', nbinsx=360, marker=dict(color='rgb(255, 98, 102)')))
+        fig.update_layout({'xaxis_title': f'{name}'})
+        fig.update_yaxes(fixedrange=True)
+        fig.update_xaxes(range=[0, 360])
+        return fig
 
     def _create_2d_figure(self, x, y, hkl_str_all, mask_in, color_map, axis_titles, step):
         fig = make_subplots(rows=2, cols=2, shared_xaxes=True, shared_yaxes=True)
@@ -410,8 +442,10 @@ class Experiment:
         y_in = y[mask_in]
 
         min_x, max_x = min(x), max(x)
-        fig.add_trace(go.Histogram(x=x_in, marker={'color': 'blue'}, nbinsx=1+round(np.abs((min_x - max_x) / step))), row=2, col=1)
-        fig.add_trace(go.Histogram(x=x, marker={'color': 'red'}, nbinsx=1+round(np.abs((min_x - max_x) / step))), row=2, col=1)
+        fig.add_trace(go.Histogram(x=x_in, marker={'color': 'blue'}, nbinsx=1 + round(np.abs((min_x - max_x) / step))),
+                      row=2, col=1)
+        fig.add_trace(go.Histogram(x=x, marker={'color': 'red'}, nbinsx=1 + round(np.abs((min_x - max_x) / step))),
+                      row=2, col=1)
         fig.add_trace(go.Histogram(y=y_in, marker={'color': 'blue'}, nbinsx=360), row=1, col=2)
         fig.add_trace(go.Histogram(y=y, marker={'color': 'red'}, nbinsx=360), row=1, col=2)
         return fig
@@ -451,7 +485,7 @@ class Experiment:
         )
         return fig
 
-    def _prepare_detecrtor_obstacles_modules(self, factor_detector, factor_obstacles, det_prm):
+    def _prepare_detector_obstacles_modules(self, factor_detector, factor_obstacles, det_prm):
         detector = None
         obstacles = []
         if factor_detector:
@@ -470,7 +504,7 @@ class Experiment:
     def generate_diffraction_map_3d(self, reflections, yxz_rotations, initial_angles, xz_steps, xz_ranges,
                                     check_collisions=False, factor_detector=False, factor_obstacles=True, det_prm=None):
         x_vals, z_vals = sf.prepare_xy_grid_flatten(xy_ranges=xz_ranges, xy_steps=xz_steps)
-        detector, obstacles = self._prepare_detecrtor_obstacles_modules(factor_detector, factor_obstacles, det_prm)
+        detector, obstacles = self._prepare_detector_obstacles_modules(factor_detector, factor_obstacles, det_prm)
         if check_collisions and self.logic_collision:
             names = [self.axes_names[i] for i in yxz_rotations[1:]]
             bool_mask = self._generate_boolean_mask_collision_scheme(angles=(x_vals, z_vals), names=names,
@@ -501,12 +535,35 @@ class Experiment:
         fig = self._prepare_fig_3d_diff_map(data_in=data_in, detector=detector, obstacles=obstacles, yxz_names=names)
         return fig
 
+    def generate_diffraction_map_1d(self, reflections, original_hkl, rotation, initial_angles, check_collisions=False,
+                                    factor_detector=False, factor_obstacles=True, det_prm=None):
+        detector, obstacles = self._prepare_detector_obstacles_modules(factor_detector, factor_obstacles, det_prm)
+        diff_vecs_array, hkl_array, hkl_orig_array, angles_array = self.cell.map_1d_v2(
+            reflections=reflections, original_hkl=original_hkl, all_rotations=self.axes_rotations,
+            directions=self.axes_directions, angles=initial_angles, wavelength=self.wavelength, scan_axis=rotation)
+
+        name = [self.axes_names[rotation]]
+        angles_array = np.rad2deg(angles_array)
+        if check_collisions and self.logic_collision:
+            bool_mask = self._generate_boolean_mask_collision_scheme(
+                angles=(angles_array,),
+                names=name,
+                initial_angles=initial_angles,
+                detector=detector)
+            angles_array = angles_array[bool_mask.reshape(-1, 1)[:, 0]]
+            diff_vecs_array = diff_vecs_array[bool_mask.reshape(-1, 1)[:, 0]]
+            hkl_array = hkl_array[bool_mask.reshape(-1, 1)[:, 0]]
+            hkl_orig_array = hkl_orig_array[bool_mask.reshape(-1, 1)[:, 0]]
+        data_in = (diff_vecs_array, angles_array, hkl_array, hkl_orig_array)
+        fig = self._prepare_fig_1d_diff_map(data_in=data_in, detector=detector, obstacles=obstacles, name=name[0], )
+        return fig
+
     def generate_diffraction_map_2d(self, reflections, yx_rotations, initial_angles, x_step, x_range,
                                     check_collisions=False, factor_detector=False, factor_obstacles=True, det_prm=None):
         x_vals = np.arange(x_range[0], x_range[1], x_step)
-        detector, obstacles = self._prepare_detecrtor_obstacles_modules(factor_detector, factor_obstacles, det_prm)
+        detector, obstacles = self._prepare_detector_obstacles_modules(factor_detector, factor_obstacles, det_prm)
         if check_collisions and self.logic_collision:
-            names = [self.axes_names[yx_rotations[1]]]
+            names = (self.axes_names[yx_rotations[1]])
             bool_mask = self._generate_boolean_mask_collision_scheme(angles=(x_vals,), names=names,
                                                                      initial_angles=initial_angles, detector=detector)
             x_vals = x_vals[bool_mask].reshape(-1)
@@ -517,11 +574,11 @@ class Experiment:
                                                                            x_values=x_vals,
                                                                            wavelength=self.wavelength,
                                                                            all_rotations=self.axes_rotations)
-        names = [self.axes_names[i] for i in yx_rotations]
+        names = (self.axes_names[i] for i in yx_rotations)
         anglesy = np.rad2deg(anglesy)
         if check_collisions and self.logic_collision:
             bool_mask = self._generate_boolean_mask_collision_scheme(
-                angles=(anglesy.copy(), anglesx.reshape(-1)),
+                angles=(anglesy, anglesx.reshape(-1)),
                 names=names,
                 initial_angles=initial_angles,
                 detector=detector)
@@ -535,15 +592,26 @@ class Experiment:
                                             step=x_step)
         return fig
 
-    def _prepare_fig_2d_diff_map(self, data_in, detector, obstacles, yx_names, step):
-        data_out_default = (np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1),
-                            np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1),
-                            )
+    def _map_data_preprocessing(self, data_in, detector, obstacles, data_o_dflt):
         if detector or obstacles:
             data_in, data_out_list = self._apply_filters(data_in, detector, obstacles)
-            data_out = self._combine_filter_results([data_out_default] + data_out_list, data_out_default)
+            data_out = self._combine_filter_results([data_o_dflt] + data_out_list, data_o_dflt)
         else:
-            data_out = data_out_default
+            data_out = data_o_dflt
+        return data_in, data_out
+
+    def _prepare_fig_1d_diff_map(self, data_in, detector, obstacles, name):
+        data_out_default = (np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1),
+                            np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 3),)
+        data_in, data_out = self._map_data_preprocessing(data_in, detector, obstacles, data_out_default)
+        x_flat, hkl_encoded_flat, hkl_orig_encoded_flat, mask_in = self._prepare_plot_1d_data(data_in, data_out)
+        return self._create_1d_figure(x_flat, hkl_encoded_flat, hkl_orig_encoded_flat, mask_in, name)
+
+    def _prepare_fig_2d_diff_map(self, data_in, detector, obstacles, yx_names, step):
+        data_out_default = (np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1),
+                            np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1),)
+
+        data_in, data_out = self._map_data_preprocessing(data_in, detector, obstacles, data_out_default)
         x_flat, y_flat, hkl_str_flat, mask_in = self._prepare_plot_2d_data(data_in, data_out)
         hkl_str_i = sf.hkl_to_str(data_in[2].astype(int))
         color_map = self._generate_color_map(hkl_str_i)
@@ -553,11 +621,7 @@ class Experiment:
         data_out_default = (np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1),
                             np.array([]).reshape(-1, 3), np.array([]).reshape(-1, 1),
                             np.array([]).reshape(-1, 1))
-        if detector or obstacles:
-            data_in, data_out_list = self._apply_filters(data_in, detector, obstacles)
-            data_out = self._combine_filter_results([data_out_default] + data_out_list, data_out_default)
-        else:
-            data_out = data_out_default
+        data_in, data_out = self._map_data_preprocessing(data_in, detector, obstacles, data_out_default)
         x_flat, y_flat, z_flat, hkl_str_flat, mask_in = self._prepare_plot_3d_data(data_in, data_out)
         hkl_str_i = sf.hkl_to_str(data_in[2].astype(int))
         color_map = self._generate_color_map(hkl_str_i)
@@ -652,10 +716,6 @@ class Experiment:
 
     def set_logic_collision(self, collision_list):
         self.logic_collision = collision_list
-        pass
-
-    def _check_collision_input(self, collision_data):
-        # TODO make a check for collision input
         pass
 
     def del_logic_collision(self):
@@ -965,7 +1025,7 @@ class Experiment:
 
         if self.logic_collision and self.check_logic_collision:
             sf.check_collision(self, runs_list)
-
+        self.scans = []
         for run_dict in runs_list:
             self.add_scan(**run_dict)
 

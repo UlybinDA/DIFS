@@ -19,6 +19,7 @@ from my_logger import mylogger
 import os
 import dash_ag_grid as dag
 import copy
+from main import Sample
 
 css_path = os.path.join(os.path.dirname(__file__), 'assets', 'style_main.css')
 goniometer_models_path = os.path.join(os.path.dirname(__file__), 'instruments', 'goniometers')
@@ -2045,9 +2046,7 @@ def load_instrument(json_f, table_num):
         json_data = sf.process_dcc_upload_json(json_f)
     except JSONDecodeError:
         return (True, read_json_error.header, read_json_error.body), *([no_upd] * 14), None
-    print(json_data)
     instrument_data = exp1.load_instrument(data_=json_data, extra=table_num)
-    print(instrument_data)
     results = []
 
     flags_loaded = sf.get_loaded_flags(instrument_data)
@@ -2184,11 +2183,11 @@ def load_runs(contents, table_num):
     if contents is None:
         raise dash.exceptions.PreventUpdate()
     try:
-        data_list = sf.process_dcc_upload_json(contents)
+        data_dict = sf.process_dcc_upload_json(contents)
     except JSONDecodeError:
         return None, (True, read_json_error.header, read_json_error.body), no_upd, no_upd, None
     try:
-        runs_tables, table_num = exp1.load_scans(data_list, table_num=table_num)
+        runs_tables, table_num = exp1.load_scans(data_dict, table_num=table_num)
     except (RunsDictError, InstrumentError, CollisionError) as e:
         return None, (True, e.error_modal_content.header, e.error_modal_content.body), no_upd, no_upd, no_upd
     return None, no_upd, table_num, *[runs_tables] * 2
@@ -2960,10 +2959,20 @@ def calculate_diff_map(n_clicks, map_type, data_container, det_data):
 
         y_axis = axes_data['y_axis']
         angles = list(angles_data.values())
-        name = exp1.axes_names[y_axis]
-        fig = exp1.cell.map_1d(reflections, original_hkl=hkl_orig, rotations=exp1.axes_rotations, angles=angles,
-                               directions=exp1.axes_directions, rotation_direction=y_axis, wavelength=exp1.wavelength,
-                               name=name, visualise=False)
+        if det_data['factor_detector']:
+            det_prm = {'dist': det_data['d_dist'],
+                       'rot': (det_data['rot_x'], det_data['rot_y'], det_data['rot_z']),
+                       'orientation': det_data['orientation'],
+                       'disp_y': det_data['disp_y'],
+                       'disp_z': det_data['disp_z']}
+            fig = exp1.generate_diffraction_map_1d(reflections=reflections, original_hkl=hkl_orig, rotation=y_axis,
+                                                   initial_angles=angles, det_prm=det_prm, factor_detector=True,
+                                                   check_collisions=det_data['factor_collision'],
+                                                   factor_obstacles=det_data['factor_obstacles'])
+        else:
+            fig = exp1.generate_diffraction_map_1d(reflections=reflections, original_hkl=hkl_orig, rotation=y_axis,
+                                                   initial_angles=angles, check_collisions=det_data['factor_collision'],
+                                                   factor_obstacles=det_data['factor_obstacles'])
 
         return fig, '1d map'
 
@@ -3032,36 +3041,31 @@ def calc_1d_section(relayoutdata, map_type, data_container, fig):
         raise dash.exceptions.PreventUpdate()
 
     if 'xaxis.autorange' in keys:
-        sweep = 360
         start_angle = 0
+        end_angle = 360
     else:
-        sweep = relayoutdata['xaxis.range[1]'] - relayoutdata['xaxis.range[0]']
-        sweep = 360 if sweep > 360 else sweep
-        start_angle = relayoutdata['xaxis.range[0]'] if relayoutdata['xaxis.range[0]'] >= 0 else 0
-        if start_angle > 360:
-            start_angle = start_angle % 360
-        elif start_angle < 0:
-            start_angle = 360 - (start_angle % 360)
+        xaxis_r0, xaxis_r1 = relayoutdata['xaxis.range[0]'], relayoutdata['xaxis.range[1]']
+        start_angle = xaxis_r0 if xaxis_r0 <= xaxis_r1 else xaxis_r1
+        end_angle = xaxis_r1 if xaxis_r0 <= xaxis_r1 else xaxis_r0
+    start_angle, end_angle = np.deg2rad(start_angle), np.deg2rad(end_angle)
 
-    axes_data = data_container['props']['children'][0]['props']['children']['props']['data'][0]
-    angles_data = data_container['props']['children'][1]['props']['children']['props']['data'][0]
-    angles = list(angles_data.values())
-    axis = axes_data['y_axis']
-    angles[axis] = start_angle
-    n_of_ref = int(np.array(fig['data'][0]['customdata'])[:, :3].shape[0] / 2)
-    reflections = np.array(fig['data'][0]['customdata'])[:n_of_ref, :3]
-    reflections_orig = np.array(fig['data'][0]['customdata'])[:n_of_ref, 3:]
-    angle1, angle2 = exp1.cell.scan(scan_type='???', scan_sweep=sweep, rotations=exp1.axes_rotations, angles=angles,
-                                    directions=exp1.axes_directions, no_of_scan=axis, hkl_array=reflections,
-                                    hkl_array_orig=reflections_orig, wavelength=exp1.wavelength, only_angles=True)
-    ref1_bool, ref2_bool = (~np.isnan(angle1), ~np.isnan(angle2))
-    bool_arr = ref1_bool | ref2_bool
-    all_reflections = np.count_nonzero(ref1_bool) + np.count_nonzero(ref2_bool)
-    reflections_unique = np.count_nonzero(ref1_bool | ref2_bool)
-    reflections_orig_unique = np.unique(reflections_orig[bool_arr[:, 0]], axis=0).shape[0]
-    all_str = f'{all_reflections} reflections at selected range'
-    uniq_str = f'{reflections_unique} unique reflections at selected range'
-    uniq_orig_str = f'{reflections_orig_unique} independent reflections at selected range'
+    diff_angles = np.array(fig['data'][0]['x'])
+    diff_angles = np.deg2rad(diff_angles)
+    reflections_encoded = np.array(fig['data'][0]['customdata'])
+    hkl_encoded = reflections_encoded[0]
+    hkl_orig_encoded = reflections_encoded[1]
+    min_, max_, range_ = Sample.angle_range(start_rad=start_angle, end_rad=end_angle)
+    mask = Sample.angles_in_sweep(angles_array=diff_angles,sweep_type=range_,start=min_,end=max_,return_bool=True )
+    hkl_encoded = hkl_encoded[mask]
+    hkl_orig_encoded = hkl_orig_encoded[mask]
+
+    n_of_all_reflections = len(hkl_encoded)
+    n_of_unique_reflections = len(np.unique(hkl_encoded))
+    n_of_unique_orig_reflections = len(np.unique(hkl_orig_encoded))
+
+    all_str = f'{n_of_all_reflections} reflections at selected range'
+    uniq_str = f'{n_of_unique_reflections} unique reflections at selected range'
+    uniq_orig_str = f'{n_of_unique_orig_reflections} independent reflections at selected range'
     return all_str, uniq_str, uniq_orig_str
 
 

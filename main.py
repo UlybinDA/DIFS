@@ -1241,14 +1241,14 @@ class Sample():
         return data_in
 
     def map_2d_v2(self,
-              reflections: np.ndarray,
-              directions: Tuple[int],
-              angles: Tuple[float],
-              all_rotations: Tuple[str],
-              yx_rotations: Tuple[int],
-              x_values: np.ndarray,
-              wavelength: float,
-              ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                  reflections: np.ndarray,
+                  directions: Tuple[int],
+                  angles: Tuple[float],
+                  all_rotations: Tuple[str],
+                  yx_rotations: Tuple[int],
+                  x_values: np.ndarray,
+                  wavelength: float,
+                  ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         angles_ = list(angles)
         diffraction_vecs_list = []
         diffraction_angles_list = []
@@ -1274,121 +1274,26 @@ class Sample():
         data_in = (diff_vecs_array, diff_angles_array, hkl_array, anglesx)
         return data_in
 
+    def map_1d_v2(self,
+                  reflections: np.ndarray,
+                  original_hkl: np.ndarray,
+                  all_rotations: str,
+                  directions: Tuple[int, int, int],
+                  angles: Tuple[float, float, float],
+                  scan_axis: int,
+                  wavelength: float,
+                  ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray,]:
 
-    def map_2d(self,
-               reflections: np.ndarray,
-               rotations: str,
-               directions: Tuple[int, int, int],
-               angles: Tuple[float, float, float],
-               rotation_directions: Tuple[int, int, int],
-               step: float,
-               range_x: Tuple[float, float],
-               wavelength: float,
-               names: Tuple[str, str],
-               visualise: bool = True) -> Union[None, go.Figure]:
+        diff_vecs, hkl_array, hkl_orig_array, angles_array = self.scan(scan_type='???', scan_sweep=360,
+                                                                       rotations=all_rotations, angles=angles,
+                                                                       directions=directions,
+                                                                       no_of_scan=scan_axis,
+                                                                       hkl_array=reflections,
+                                                                       hkl_array_orig=original_hkl,
+                                                                       wavelength=wavelength)
+        angles_array[angles_array == 360.] = 0.
+        return diff_vecs, hkl_array, hkl_orig_array, angles_array
 
-        x_range = np.arange(range_x[0], range_x[1], step).astype(float)
-        x_len = len(x_range)
-        angles_ = angles
-        n_of_reflections = reflections.shape[0]
-        first = True
-        for anglex in x_range:
-            angles_[rotation_directions[1]] = anglex
-            angle1, angle2 = self.scan(scan_type='???', scan_sweep=360, rotations=rotations, angles=angles_,
-                                       directions=directions, no_of_scan=rotation_directions[0], hkl_array=reflections,
-                                       hkl_array_orig=reflections, wavelength=wavelength, only_angles=True)
-            if first is True:
-                first = False
-                angle1_array = angle1
-                angle2_array = angle2
-            else:
-                angle1_array = np.concatenate((angle1_array, angle1))
-                angle2_array = np.concatenate((angle2_array, angle2))
-        angle_array = np.rad2deg(np.vstack((angle1_array, angle2_array)))
-        x_angle_array = np.tile(np.tile(x_range.reshape(-1, 1), (1, n_of_reflections)).reshape(-1, 1), (2, 1))
-        x_angle_array[np.isnan(angle_array)] = np.nan
-        histx = x_angle_array[~np.isnan(x_angle_array)]
-        hkl_str = np.tile(
-            np.tile(np.char.add(np.char.add(np.char.add(np.char.add(reflections[:, 0].astype(int).astype(str), ' '),
-                                                        reflections[:, 1].astype(int).astype(str)), ' '),
-                                reflections[:, 2].astype(int).astype(str)).reshape(-1, 1), (x_len, 1)), (2, 1))
-        sort_arr = np.argsort(hkl_str.reshape(2, -1)[0].reshape(-1))
-        hkl_str_1 = hkl_str.reshape(2, -1)[0][sort_arr].reshape(n_of_reflections, -1, )
-        ang1_sorted = np.rad2deg(angle1_array.reshape(-1)[sort_arr]).reshape(n_of_reflections, -1, )
-        ang2_sorted = np.rad2deg(angle2_array.reshape(-1)[sort_arr]).reshape(n_of_reflections, -1, )
-        histy = np.array([])
-        for n, hkl in enumerate(hkl_str_1):
-            histy_new1 = np.unique(np.round(ang1_sorted[n]))
-            histy_new2 = np.unique(np.round(ang2_sorted[n]))
-            histy = np.concatenate((histy, histy_new1, histy_new2))
-        histy = histy[~np.isnan(histy)]
-        histy[histy == 360.] = 0.
-        random_rgb_colors1 = (
-            np.round(np.tile(np.tile(np.random.rand(n_of_reflections), (1, x_len)), (1, 2)) * 255)).astype(int).astype(
-            str)
-        random_rgb_colors2 = (
-            np.round(np.tile(np.tile(np.random.rand(n_of_reflections), (1, x_len)), (1, 2)) * 255)).astype(int).astype(
-            str)
-        random_rgb_colors3 = (
-            np.round(np.tile(np.tile(np.random.rand(n_of_reflections), (1, x_len)), (1, 2)) * 255)).astype(int).astype(
-            str)
-        color_rgb_array = np.char.add(np.char.add(
-            np.char.add(np.char.add(np.char.add(np.char.add('rgb(', random_rgb_colors1), ', '), random_rgb_colors2, ),
-                        ', '), random_rgb_colors3), ')')
-
-        data = {
-            f'{names[0]}': angle_array.reshape(-1),
-            f'{names[1]}': x_angle_array.reshape(-1),
-            'colors': color_rgb_array.reshape(-1),
-            'hkl': hkl_str
-        }
-
-        print(int(np.abs(range_x[0] - range_x[1]) / step))
-        fig1 = make_subplots(rows=2, cols=2, shared_xaxes=True, shared_yaxes=True)
-        fig1.add_trace(go.Histogram(x=histx, nbinsx=int(np.abs(range_x[0] - range_x[1]) / step)), row=2, col=1)
-        fig1.add_trace(go.Histogram(y=histy, nbinsy=360), row=1, col=2)
-        fig1.add_trace(
-            go.Scatter(x=data[f'{names[1]}'], y=data[f'{names[0]}'], marker={'size': 1.5, 'color': data['colors']},
-                       mode='markers', customdata=data['hkl'],
-                       hovertemplate='<b>hkl</b>: %{customdata[0]}<b>'),
-            row=1, col=1)
-        fig1.update_layout({'xaxis_title': f'{names[1]}', 'yaxis_title': f'{names[0]}'}, )
-
-        if visualise == True:
-            fig1.show()
-        else:
-            return fig1
-
-    def map_1d(self,
-               reflections: np.ndarray,
-               original_hkl: np.ndarray,
-               rotations: str,
-               directions: Tuple[int, int, int],
-               angles: Tuple[float, float, float],
-               rotation_direction: int,
-               wavelength: float,
-               name: str,
-               visualise: bool = True) -> Union[None, go.Figure]:
-
-        angle1, angle2 = self.scan(scan_type='???', scan_sweep=360, rotations=rotations, angles=angles,
-                                   directions=directions, no_of_scan=rotation_direction, hkl_array=reflections,
-                                   hkl_array_orig=reflections, wavelength=wavelength, only_angles=True)
-        angle_array = np.round(np.rad2deg(np.vstack((angle1, angle2))))
-        angle_array[angle_array == 360.] = 0
-        reflections = np.vstack((reflections, reflections))
-        original_hkl = np.vstack((original_hkl, original_hkl))
-        angle_array = angle_array[~np.isnan(angle_array)]
-        fig = px.histogram(x=angle_array, nbins=360, range_x=(0, 359))
-        fig['data'][0]['customdata'] = np.hstack((reflections, original_hkl))
-        print(fig['data'][0]['customdata'])
-        fig.update_layout({'xaxis_title': f'{name}'})
-        fig.update_yaxes(fixedrange=True)
-        fig.update_xaxes(range=[0, 360])
-
-        if visualise == True:
-            fig.show()
-        else:
-            return fig
 
     def zenith_azimuth_rev_vect(self,
                                 vector: np.ndarray,
