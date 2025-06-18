@@ -3,7 +3,7 @@ from pointsymmetry import PG_KEYS
 from Exceptions import CollisionError, InstrumentError, NoScanDataError, CDCCError
 from Modals_content import instrument_error_no_goniometer, calc_collision_error, MODAL_TUPLE, \
     no_scan_data_to_save_error, CDCC_no_data_error
-from main import Sample, Ray_obstacle, DiamondAnvil
+from main import Sample, Ray_obstacle, DiamondAnvil, LinkedObstacle
 import warnings
 import json
 import app_gens as apg
@@ -49,6 +49,7 @@ class Experiment:
         self.data_anvil_flag = True
         self.incident_beam_vec = np.array([1., 0., 0.])
         self.cdcc = sf.CumulativeDataCalculator()
+        self.linked_obstacles = list()
 
     def set_wavelength(self, wavelength):
         self.wavelength = wavelength
@@ -140,10 +141,16 @@ class Experiment:
         except AttributeError:
             warnings.warn('List of constant obstacles is empty')
 
+    def add_linked_obstacle(self,highest_linked_axis_index, distance, geometry, orientation, rot, displacement_y=None, displacement_z=None, height=None,
+                      width=None, diameter=None, name='',):
+        lo = LinkedObstacle(dist=distance,geometry=geometry,orientation=orientation,rot=rot,
+                                         disp_y=displacement_y,disp_z=displacement_z,height=height,width=width,name=name,
+                                         diameter=diameter,highest_linked_axis_index=highest_linked_axis_index)
+        self.linked_obstacles.append(lo)
+
     def add_scan(self, det_dist, det_angles, det_orientation, axes_angles, scan, sweep, det_disp_y=None,
                  det_disp_z=None):
         scan_ = (det_dist, det_angles, det_orientation, axes_angles, scan, sweep, det_disp_y, det_disp_z)
-
         if hasattr(self, 'scans'):
             self.scans.append(scan_)
         else:
@@ -228,29 +235,14 @@ class Experiment:
                                                        )
 
             if self.det_geometry is not None:
-                detector = Ray_obstacle(dist=scan[0], geometry=self.det_geometry, height=self.det_height, rot=scan[1],
-                                        orientation=scan[2], width=self.det_width, diameter=self.det_diameter,
-                                        complex=self.det_complex, complex_format=self.det_complex_format,
-                                        row_col_spacing=self.det_row_col_spacing, disp_y=scan[6], disp_z=scan[7],
-                                        )
-                if self.det_complex:
-                    data = detector.filter_complex_obstacle(diff_vecs=data[0], data=data, mode='transmit')
-                    i = 0
-                    for chip_data in data:
-                        if i == 0:
-                            diff_vecs, hkl, hkl_orig, angles = chip_data[0]
-                        else:
-                            diff_vecs = np.vstack((diff_vecs, chip_data[0][0]))
-                            hkl = np.vstack((hkl, chip_data[0][1]))
-                            hkl_orig = np.vstack((hkl_orig, chip_data[0][2]))
-                            angles = np.vstack((angles, chip_data[0][3]))
-                        i += 1
-                    data = (diff_vecs, hkl, hkl_orig, angles)
-                    data = detector.trash_dead_areas(data=data)
+                data = self._apply_detector(data=data, dist=scan[0], orientation=scan[2], rot=scan[1], disp_y=scan[6],
+                                            disp_z=scan[7])
 
-                else:
-                    data = detector.filter(diff_vecs=data[0], data=data, mode='transmit')
-                    data = detector.trash_dead_areas(data=data)
+            for lo in self.linked_obstacles:
+                lo.filter_linked_obstacle(scan_axis_index=scan[4],diff_vectors=data[0],initial_axes_angles=scan[3],
+                                          diff_angles=data[3],mode='shade',directions_axes=self.axes_directions,
+                                          rotation_axes=self.axes_rotations,data=data)
+
 
             if hasattr(self, 'obstacles') and self.obstacles != list():
                 for obstacle in self.obstacles:
@@ -270,6 +262,33 @@ class Experiment:
         if hasattr(self, 'known_hkl_orig'):
             delattr(self, 'known_hkl_orig')
         return True, None
+
+    def _apply_detector(self,data, dist, orientation, rot, disp_y, disp_z ):
+        if self.det_geometry is not None:
+            detector = Ray_obstacle(dist=dist, geometry=self.det_geometry, height=self.det_height, rot=rot,
+                                    orientation=orientation, width=self.det_width, diameter=self.det_diameter,
+                                    complex=self.det_complex, complex_format=self.det_complex_format,
+                                    row_col_spacing=self.det_row_col_spacing, disp_y=disp_y, disp_z=disp_z,
+                                    )
+            if self.det_complex:
+                data = detector.filter_complex_obstacle(diff_vecs=data[0], data=data, mode='transmit')
+                i = 0
+                for chip_data in data:
+                    if i == 0:
+                        diff_vecs, hkl, hkl_orig, angles = chip_data[0]
+                    else:
+                        diff_vecs = np.vstack((diff_vecs, chip_data[0][0]))
+                        hkl = np.vstack((hkl, chip_data[0][1]))
+                        hkl_orig = np.vstack((hkl_orig, chip_data[0][2]))
+                        angles = np.vstack((angles, chip_data[0][3]))
+                    i += 1
+                data = (diff_vecs, hkl, hkl_orig, angles)
+                data = detector.trash_dead_areas(data=data)
+
+            else:
+                data = detector.filter(diff_vecs=data[0], data=data, mode='transmit')
+                data = detector.trash_dead_areas(data=data)
+            return data
 
     def _create_obstacle(self, obstacle_data):
         obstacle_ = Ray_obstacle(dist=obstacle_data[0], geometry=obstacle_data[1], orientation=obstacle_data[2],
@@ -432,9 +451,8 @@ class Experiment:
                 , row=1,
                 col=1)
         fig.update_layout(
-            # Общие настройки осей (для главных осей)
-            xaxis_title=axis_titles[1],  # Ось X нижнего левого графика (row=2, col=1)
-            yaxis_title=axis_titles[0],  # Ось Y верхнего левого графика (row=1, col=1)
+            xaxis_title=axis_titles[1],
+            yaxis_title=axis_titles[0],
         )
         y = np.round(y)
         y[y == 360] = 0
@@ -1052,11 +1070,11 @@ import service_functions as sf
 
 if __name__ == '__main__':
     exp2 = Experiment()
-    UB = np.array([
-        [-0.11849422651445085, 0.0011282219480121245, -0.01823725003496405],
-        [-0.01685865323149584, -0.0817301363822078, 0.05102827245551952],
-        [-0.01935107006442972, 0.06386615672860567, 0.06568363644621458],
-    ])
+    # UB = np.array([
+    #     [-0.11849422651445085, 0.0011282219480121245, -0.01823725003496405],
+    #     [-0.01685865323149584, -0.0817301363822078, 0.05102827245551952],
+    #     [-0.01935107006442972, 0.06386615672860567, 0.06568363644621458],
+    # ])
     parameters = [15, 15, 15, 90.000, 90, 90]
     # exp2.set_cell(matr=UB)
     exp2.set_cell(parameters=parameters, om_chi_phi=(0, 0, 0))
@@ -1067,18 +1085,24 @@ if __name__ == '__main__':
     angles = [
         [0, 54.71, 0],
 
-        [120, 54.71, 0],
-
-        [240, 54.71, 0],
+        # [120, 54.71, 0],
+        #
+        # [240, 54.71, 0],
         # [0, 0, 20, -90],
         # [0, 0, 40, -90],
         # [0, 0, 60, -90],
         # [0, 0, 80, -90],
     ]
-    sweeps = [50, 100, 150]
+    sweeps = [
+        360,
+        # 100,
+        # 150
+    ]
     rotation_dirs = (-1, -1, 1)
     # aperture = 40
     # anvil_normal = np.array([1., 0., 0.])
+    exp2.add_linked_obstacle(highest_linked_axis_index=0,distance=40,geometry='circle',orientation='normal',rot=(0,0,0),
+                             displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle, sweep in zip(angles, sweeps):
@@ -1088,14 +1112,6 @@ if __name__ == '__main__':
     # exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
     # exp2.calc_anvil_flag=True
     exp2.calc_experiment(d_range=(0.68, 20))
-    exp2.refresh_cdcc()
-    angle1 = np.deg2rad(0)
-    angle2 = np.deg2rad(10)
-    # exp2.cdcc.data_container[2]['angle_roi']=(angle1,angle2)
-    exp2.cdcc.set_d_roi((50, 4))
-    # exp2.cdcc.data_container[1]['ommited']=True
-    fig2 = exp2.generate_1d_comp_cumulative_plot(order=True, permutation_indices=(2, 0, 1))
-    fig2.show()
-    # data = exp2.scan_data
-    # scan_inputs = exp2.scans
+    fig = exp2.generate_known_hkl_3d()
+    fig.show()
     # data_list = []

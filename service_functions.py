@@ -66,7 +66,7 @@ def cut_by_d(hkl_array: np.ndarray, d_range: List[float], parameters: List[float
 
 
 def generate_original_hkl_for_hkl_array(hkl_array: np.ndarray, pg: str, parameters: List[float],
-                                         centring: str = 'P') -> np.ndarray:
+                                        centring: str = 'P') -> np.ndarray:
     d_array = create_d_array(parameters=parameters, hkl_array=hkl_array)
     d_range = (min(d_array), max(d_array))
     sample = Sample(a=parameters[0], b=parameters[1], c=parameters[2], al=parameters[3], bt=parameters[4],
@@ -1544,8 +1544,10 @@ def process_runs_to_dicts_list(runs: List[List[Any]]) -> List[Dict[str, Any]]:
 
 def check_run_dict_temp(run: Dict[str, Any]) -> None:
     if any((run['det_dist'] == '', run['det_angles'][0] == '', run['det_angles'][1] == '', run['det_angles'][2] == ''
-                , run['det_orientation'] == '', run['scan'] == '', run['scan'] == '', run['sweep'] == '',
+            , run['det_orientation'] == '', run['scan'] == '', run['scan'] == '', run['sweep'] == '',
             run['sweep'] == 0)):
+        raise RunsDictError(add_runs_empty_error)
+    if run['det_orientation'] == 'independent' and (run['det_disp_y'] == '' or run['det_disp_z'] == ''):
         raise RunsDictError(add_runs_empty_error)
     if any([angle == '' for angle in run['axes_angles']]):
         raise RunsDictError(add_runs_empty_gon_error)
@@ -1686,7 +1688,8 @@ def get_loaded_flags(data_loaded: Dict[str, Union[bool, None]]) -> Dict[str, Uni
 
 
 def procces_anvil_normal_data(data):
-    normal = np.array([data[0]['anvil_normal_x'], data[0]['anvil_normal_y'], data[0]['anvil_normal_z']])
+    normal = np.array([data[0]['anvil_normal_x'], data[0]['anvil_normal_y'], data[0]['anvil_normal_z']]).astype(
+        np.float64)
     return normal
 
 
@@ -2080,7 +2083,8 @@ def process_d_range(exp_inst, d_range):
 
     return dmin, dmax
 
-@mylogger('DEBUG',log_args=True)
+
+@mylogger('DEBUG', log_args=True)
 def update_data_container(exp_inst, input_parameters, dag_length):
     for i in range(dag_length):
         run_n = input_parameters['run n'][i]

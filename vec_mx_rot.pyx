@@ -1,8 +1,6 @@
 # distutils: language = c++
 # cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True
-# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 
-import numpy as np
 cimport numpy as np
 from cython cimport boundscheck, wraparound
 cimport cython
@@ -11,15 +9,14 @@ from libc.math cimport cos, sin
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def apply_rotation_matrix(
-    np.ndarray[np.float64_t, ndim=2] vectors,
+    np.ndarray[np.float64_t, ndim=1] vector,
     np.ndarray[np.float64_t, ndim=1] angles,
     np.ndarray[np.float64_t, ndim=2] matr1,
     np.ndarray[np.float64_t, ndim=2] matr3,
     int axis,
     double direction,
-    double inv_wavelength
 ):
-    cdef Py_ssize_t n = vectors.shape[0]
+    cdef Py_ssize_t n = angles.shape[0]
     cdef np.ndarray[np.float64_t, ndim=2] result = np.empty((n, 3), dtype=np.float64)
 
     cdef int i, j, k
@@ -27,7 +24,6 @@ def apply_rotation_matrix(
     cdef double R[3][3]
     cdef double tmp1[3]
     cdef double tmp2[3]
-    cdef double vec[3]
 
     for i in range(n):
         a = angles[i] * direction
@@ -47,12 +43,11 @@ def apply_rotation_matrix(
         else:
             raise ValueError("Invalid axis")
 
-        vec[0], vec[1], vec[2] = vectors[i, 0], vectors[i, 1], vectors[i, 2]
 
         for j in range(3):
             tmp1[j] = 0
             for k in range(3):
-                tmp1[j] += matr3[j, k] * vec[k]
+                tmp1[j] += matr3[j, k] * vector[k]
 
         for j in range(3):
             tmp2[j] = 0
@@ -64,6 +59,5 @@ def apply_rotation_matrix(
             for k in range(3):
                 result[i, j] += matr1[j, k] * tmp2[k]
 
-        result[i, 0] += inv_wavelength
 
     return result

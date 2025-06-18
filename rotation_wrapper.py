@@ -1,10 +1,11 @@
 from rotation import apply_rotation_matrix
+from vec_mx_rot import apply_vec_rotation
 import numpy as np
 
+axes_dict = {'x': 0, 'y': 1, 'z': 2}
 
 
-
-def apply_rotation(rotations, no_of_scan, hkl_rotated, angles, matr1, matr3, directions, wavelength):
+def apply_rotation_vecs(rotations, no_of_scan, hkl_rotated, angles, matr1, matr3, directions, wavelength):
     assert isinstance(hkl_rotated, np.ndarray)
     assert isinstance(angles, np.ndarray)
     assert hkl_rotated.dtype == np.float64, f"Expected float64, got {hkl_rotated.dtype}"
@@ -16,7 +17,7 @@ def apply_rotation(rotations, no_of_scan, hkl_rotated, angles, matr1, matr3, dir
     assert matr3.shape == (3, 3)
 
     axis_char = rotations[no_of_scan]
-    axis = {'x': 0, 'y': 1, 'z': 2}[axis_char]
+    axis = axes_dict[axis_char]
     return apply_rotation_matrix(
         vectors=hkl_rotated,
         angles=angles[:, 0],
@@ -26,3 +27,27 @@ def apply_rotation(rotations, no_of_scan, hkl_rotated, angles, matr1, matr3, dir
         direction=directions[no_of_scan],
         inv_wavelength=1.0 / wavelength
     )
+
+
+def apply_rotation_vec(vector, angles, matr1, matr3, axis, direction):
+    assert isinstance(vector, np.ndarray)
+    vector = vector.reshape(-1).astype(np.float64)
+    angles = angles.reshape(-1).astype(np.float64)
+    direction = float(direction)
+    assert isinstance(angles, np.ndarray)
+    assert isinstance(matr1, np.ndarray)
+    assert isinstance(matr3, np.ndarray)
+    assert isinstance(axis, str)
+    assert vector.dtype == np.float64, f"Vector.dtype expected float64, got {vector.dtype}"
+    assert axis in {'x', 'y', 'z'} and len(axis) == 1
+    assert isinstance(direction, float)
+    assert matr1.shape == (3, 3)
+    assert matr3.shape == (3, 3)
+    axis = axes_dict[axis]
+    return apply_vec_rotation(
+        vector,
+        angles,
+        matr1,
+        matr3,
+        axis,
+        direction)

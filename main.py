@@ -1,20 +1,15 @@
-import pandas as pd
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-import time
 from io import StringIO
 import warnings
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from Modals_content import *
 from Exceptions import DiamondAnvilError
 from pointsymmetry import generate_hkl_by_pg, PG_KEYS, get_key, generate_orig_hkl_array
 from my_logger import mylogger
 from typing import Tuple, Union, Optional, List, Dict, Any
 from nptyping import NDArray, Shape, Float, Int
-from rotation_wrapper import apply_rotation
-import random
+from rotation_wrapper import apply_rotation_vecs, apply_rotation_vec
+from obst_check_wrapper import check_circle_angle, check_circle_intersection, check_rectangle_intersection
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -60,7 +55,8 @@ class Ray_obstacle():
                  complex_format: Tuple[int, int] = (5, 2),
                  row_col_spacing: Tuple[float, float] = (0.344, 2.924),
                  chip_thickness: Optional[float] = None,
-                 dead_areas: Optional[List[Tuple[float, float]]] = None):
+                 dead_areas: Optional[List[Tuple[float, float]]] = None,
+                 name: str = ''):
 
         self.dist = dist
         self.disp_y, self.disp_z = (disp_y, disp_z)
@@ -72,6 +68,7 @@ class Ray_obstacle():
         self.rot = rot
         self.chip_thickness = chip_thickness
         self.dead_areas = dead_areas
+        self.name = name
 
         if orientation == 'normal':
             self.vec_origin_to_centre = np.array([dist, 0, 0])
@@ -411,6 +408,45 @@ class Ray_obstacle():
             print('incorrect mode in slicing function')
         return data
 
+    def _prepare_obstacle_vecs(self, orientation, geometry, rotation, vec_origin_to_centre, disp_y=0, disp_z=0,
+                               height=None, width=None, diameter=None):
+        if orientation == 'independent':
+            if geometry == 'rectangle':
+                vecs = np.array(
+                    [[0, width / 2, height / 2], [0, width / 2, -height / 2], [0, -width / 2, -height / 2],
+                     [0, -width / 2, height / 2]])
+                vecs = rotation.apply(vecs)
+                vecs = vecs + vec_origin_to_centre
+
+            else:
+                vecs = rotation.apply(np.array([[0, diameter / 2, 0]])) + vec_origin_to_centre
+                normal = rotation.apply(np.array([[1, 0, 0]]))
+                vecs = np.vstack((vecs, normal))
+
+
+
+        elif orientation == 'normal':
+            if disp_y or disp_z != 0:
+                print('disp y or z is not 0 if its made intentionally switch to independent orientation')
+
+            if geometry == 'rectangle':
+                vecs = np.array(
+                    [[0, width / 2, height / 2], [0, width / 2, -height / 2], [0, -width / 2, -height / 2],
+                     [0, -width / 2, height / 2]])
+                vecs = vecs + vec_origin_to_centre
+                vecs = rotation.apply(vecs)
+            else:
+                vecs = np.array([[0, 0, 0], [0, 0, diameter / 2]]) + vec_origin_to_centre
+                vecs = rotation.apply(vecs)
+
+        return vecs
+
+    def _slice_data(self, data, check, mode):
+        data_output = tuple()
+        for array in data:
+            data_output += self.array_slice(array, check, mode)
+        return data_output
+
     @mylogger('DEBUG')
     def filter(self,
                diff_vecs: np.ndarray,
@@ -431,30 +467,14 @@ class Ray_obstacle():
         mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
 
         if vecs is None:
-            if self.orientation == 'independent':
-                if self.geometry == 'rectangle':
-                    vecs = np.array(
-                        [[0, width / 2, height / 2], [0, width / 2, -height / 2], [0, -width / 2, -height / 2],
-                         [0, -width / 2, height / 2]])
-                    vecs = rotation.apply(vecs)
-                    vecs = vecs + self.vec_origin_to_centre
-                elif self.geometry == 'circle':
-                    vecs = rotation.apply(np.array([0, diameter / 2, 0]))
-                    normal = rotation.apply(np.array([1, 0, 0]))
-                    vecs = vecs + self.vec_origin_to_centre
-
-            elif self.orientation == 'normal':
-                if self.disp_y or self.disp_z != 0:
-                    print('disp y or z is not 0 if its made intentionally switch to independent orientation')
-                if self.geometry == 'rectangle':
-                    vecs = np.array(
-                        [[0, width / 2, height / 2], [0, width / 2, -height / 2], [0, -width / 2, -height / 2],
-                         [0, -width / 2, height / 2]])
-                    vecs = vecs + self.vec_origin_to_centre
-                    vecs = rotation.apply(vecs)
-                elif self.geometry == 'circle':
-                    vecs = np.array([[0, 0, 0], [0, 0, diameter / 2]]) + self.vec_origin_to_centre
-                    vecs = rotation.apply(vecs)
+            vecs = self._prepare_obstacle_vecs(orientation=self.orientation, geometry=self.geometry,
+                                               rotation=rotation,
+                                               vec_origin_to_centre=self.vec_origin_to_centre,
+                                               disp_z=self.disp_z, disp_y=self.disp_y, height=height,
+                                               width=width, diameter=diameter)
+        else:
+            if normal:
+                vecs = np.vstack((vecs.reshape(-1, 3), normal.reshape(-1, 3)))
 
         if self.geometry == 'rectangle':
             if ang_bw_two_vects(np.cross(vecs[0], vecs[1]), vecs[2]) < np.pi / 2:
@@ -468,9 +488,7 @@ class Ray_obstacle():
                 check3 = (diff_vecs[:, 0] * normal[0] + diff_vecs[:, 1] * normal[1] + diff_vecs[:, 2] * normal[2]) > 0
                 check = (check0 & check1 & check2 & check3).reshape(-1, 1)
 
-                data_output = tuple()
-                for array in data:
-                    data_output += self.array_slice(array, check, mode)
+                data_output = self._slice_data(data, check, mode)
                 return data_output
 
             elif ang_bw_two_vects(np.cross(vecs[0], vecs[1]), vecs[2]) > np.pi / 2:
@@ -484,36 +502,35 @@ class Ray_obstacle():
                 check3 = (diff_vecs[:, 0] * normal[0] + diff_vecs[:, 1] * normal[1] + diff_vecs[:, 2] * normal[2]) > 0
                 check = (check0 & check1 & check2 & check3).reshape(-1, 1)
 
-                data_output = tuple()
-                for array in data:
-                    data_output += self.array_slice(array, check, mode)
+                data_output = self._slice_data(data, check, mode)
+                # data_output = tuple()
+                # for array in data:
+                #     data_output += self.array_slice(array, check, mode)
                 return data_output
             return None
 
         elif self.geometry == 'circle':
             if self.orientation == 'independent':
-                D = -vecs[0] * normal[0] - vecs[1] * normal[1] - vecs[2] * normal[2]
-                scalar_sum = (diff_vecs[:, 0] * normal[0]).reshape(-1, 1) + (diff_vecs[:, 1] * normal[1]).reshape(-1,
-                                                                                                                  1) + (
-                                     diff_vecs[:, 2] * normal[2]).reshape(-1, 1)
+                D = -vecs[0, 0] * vecs[1, 0] - vecs[0, 1] * vecs[1, 1] - vecs[0, 2] * vecs[1, 2]
+                scalar_sum = (diff_vecs[:, 0] * vecs[1, 0]).reshape(-1, 1) + (diff_vecs[:, 1] * vecs[1, 1]).reshape(-1,
+                                                                                                                    1) + (
+                                     diff_vecs[:, 2] * vecs[1, 2]).reshape(-1, 1)
                 check0 = scalar_sum < 0
 
                 x_intersection = (-D * diff_vecs[:, 0] / (
-                        diff_vecs[:, 0] * normal[0] + diff_vecs[:, 1] * normal[1] + diff_vecs[:, 2] * normal[
-                    2])).reshape(-1, 1)
+                        diff_vecs[:, 0] * vecs[1, 0] + diff_vecs[:, 1] * vecs[1, 1] + diff_vecs[:, 2] * vecs[1,
+                2])).reshape(-1, 1)
                 y_intersection = (-D * diff_vecs[:, 1] / (
-                        diff_vecs[:, 0] * normal[0] + diff_vecs[:, 1] * normal[1] + diff_vecs[:, 2] * normal[
-                    2])).reshape(-1, 1)
+                        diff_vecs[:, 0] * vecs[1, 0] + diff_vecs[:, 1] * vecs[1, 1] + diff_vecs[:, 2] * vecs[1,
+                2])).reshape(-1, 1)
                 z_intersection = (-D * diff_vecs[:, 2] / (
-                        diff_vecs[:, 0] * normal[0] + diff_vecs[:, 1] * normal[1] + diff_vecs[:, 2] * normal[
-                    2])).reshape(-1, 1)
+                        diff_vecs[:, 0] * vecs[1, 0] + diff_vecs[:, 1] * vecs[1, 1] + diff_vecs[:, 2] * vecs[1,
+                2])).reshape(-1, 1)
                 data_intersection = np.hstack((x_intersection, y_intersection, z_intersection)) - vec_origin_to_centre
                 check1 = ((data_intersection[:, 0] ** 2 + data_intersection[:, 1] ** 2 + data_intersection[:, 2] ** 2)
                           < (diameter / 2) ** 2).reshape(-1, 1)
                 check = check0 & check1
-                data_output = tuple()
-                for array in data:
-                    data_output += self.array_slice(array, check, mode)
+                data_output = self._slice_data(data, check, mode)
 
                 if intersection_coords is True:
                     intersections = np.hstack((x_intersection, y_intersection, z_intersection))
@@ -525,9 +542,7 @@ class Ray_obstacle():
                 max_ang = ang_bw_two_vects(vecs[0], vecs[1])
                 angs = ang_bw_two_vects(diff_vecs, vecs[0], type='array')
                 check = (angs < max_ang).reshape(-1, 1)
-                data_output = tuple()
-                for array in data:
-                    data_output += self.array_slice(array, check, mode)
+                data_output = self._slice_data(data, check, mode)
                 return data_output
             return None
 
@@ -598,67 +613,112 @@ class Ray_obstacle():
             return data
 
 
-# class LinkedObstacle(Ray_obstacle):
-#     def __init__(self,
-#                  dist: float,
-#                  geometry: str,
-#                  disp_y: float,
-#                  disp_z: float,
-#                  rot: np.ndarray,
-#                  orientation: str,
-#                  height: Optional[float] = None,
-#                  width: Optional[float] = None,
-#                  diameter: Optional[float] = None,
-#                  symmetric: bool = False,
-#                  highest_linked_axis_index: int = 0,
-#                  ):
-#         self.dist = dist
-#         self.geometry = geometry
-#         self.disp_y = disp_y
-#         self.disp_z = disp_z
-#         self.rot = rot
-#         self.orientation = orientation
-#         self.height = height
-#         self.width = width
-#         self.diameter = diameter
-#         self.symmetric = symmetric
-#         self.highest_linked_axis_index = highest_linked_axis_index
-#
-#     def filter(self,
-#                diff_vecs: np.ndarray,
-#                angles: np.ndarray,
-#                data: Tuple[np.ndarray, ...],
-#                mode: str,
-#                intersection_coords: bool = False,
-#                normal: Optional[np.ndarray] = None,
-#                vec_origin_to_centre: Optional[np.ndarray] = None) -> Tuple[np.ndarray, ...]:
-#         pass
-#
-#     def create_obst_vec_arr(self,
-#                             obst_vecs: NDArray[Shape["1, 3"], Float],
-#                             diff_angles: NDArray[Shape["-1, 1"], Float],
-#                             rotation_axes: str,
-#                             directions_axes: Tuple[int, ...],
-#                             initial_axes_angles: Tuple[float, ...],
-#                             scan_axis_index: int
-#                              ):
-#         assert set(rotation_axes).issubset(['x', 'y', 'z']) and rotation_axes != '', 'Wrong rotation axes!'
-#         n_obst_vecs = obst_vecs.shape[0]
-#         n_angles = len(diff_angles)
-#         obst_vecs_ = np.tile(obst_vecs, (n_angles, 1, 1))
-#         rot_a = rotation_axes[scan_axis_index]
-#         rot_vecs = {'x': np.array([1, 0, 0]),
-#                     'y': np.array([0, 1, 0]),
-#                     'z': np.array([0, 0, 1])}
-#         rot_vec = rot_vecs.get(rot_a)
-#         rot_vecs = rot_vec * directions_axes
-#         rot_vecs = np.repeat(rot_vecs, repeats=n_obst_vecs, axis=0)
-#         rotations = R.from_rotvec(rot_vecs)
-#         obst_vecs_ = rotations.apply(obst_vecs_.reshape(-1, 3)).reshape(n_obst_vecs, -1, 3)
-#         return obst_vecs_
-#
-#     def create_obst_vecs(self,):
-#         pass
+class LinkedObstacle(Ray_obstacle):
+    def __init__(self,
+                 highest_linked_axis_index: int,
+                 dist: float,
+                 geometry: str,
+                 disp_y: float,
+                 disp_z: float,
+                 rot: np.ndarray,
+                 orientation: str,
+                 height: Optional[float] = None,
+                 width: Optional[float] = None,
+                 diameter: Optional[float] = None,
+                 name: str = ''
+                 ):
+        super().__init__(dist=dist, geometry=geometry, disp_y=disp_y, disp_z=disp_z, rot=rot, orientation=orientation,
+                         height=height, width=width, diameter=diameter, complex=False)
+        self.highest_linked_axis_index = highest_linked_axis_index
+
+    def _zero_angle_rotation(self):
+        init_rotation = R.from_euler('xyz', angles=self.rot, degrees=True)
+        vecs = self._prepare_obstacle_vecs(orientation=self.orientation, geometry=self.geometry,
+                                           height=self.height, rotation=init_rotation, width=self.width,
+                                           diameter=self.diameter,
+                                           vec_origin_to_centre=self.vec_origin_to_centre, disp_y=self.disp_y,
+                                           disp_z=self.disp_z)
+        return vecs
+
+    def _static_angle_filter(self, vecs, axes_linked_to_obst, data, diff_vecs, mode, angles, directions):
+        angles *= directions
+        linked_rotation = R.from_euler(axes_linked_to_obst, angles=angles, degrees=True)
+        vecs = linked_rotation.apply(vecs)
+        data = self.filter(diff_vecs=diff_vecs, data=data, mode=mode, vecs=vecs)
+        return data
+
+    def filter_linked_obstacle(self, scan_axis_index, diff_vectors, initial_axes_angles, diff_angles, directions_axes, data, rotation_axes,
+                               mode):
+        mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
+        static_filter = True if self.highest_linked_axis_index > scan_axis_index else False
+        axes_linked_to_obst = rotation_axes[self.highest_linked_axis_index:]
+        angles = initial_axes_angles[self.highest_linked_axis_index:]
+        directions_axes = directions_axes[self.highest_linked_axis_index:]
+        vecs = self._zero_angle_rotation()
+        if static_filter:
+            return self._static_angle_filter(vecs, axes_linked_to_obst, data, diff_vectors, mode, angles, directions_axes)
+        else:
+            return self._dynamic_angle_filter(scan_axis_index,axes_linked_to_obst, directions_axes, angles, rotation_axes, vecs, diff_angles,
+                              diff_vectors,data, mode)
+
+    def _dynamic_angle_filter(self, scan_axis_index,axes_linked_to_obst, directions, angles, axes, vecs, diff_angles,
+                              diff_vectors,data, mode):
+        slice_shift_scan_axis = scan_axis_index - self.highest_linked_axis_index
+        matr1, matr3 = Sample.generate_rotation_matrices(axes_linked_to_obst, directions, angles,
+                                                         slice_shift_scan_axis)
+        rotation_axis = axes[slice_shift_scan_axis]
+        direction = directions[slice_shift_scan_axis]
+        vecs_rotated = []
+
+        if self.geometry == 'rectangle':
+            if ang_bw_two_vects(np.cross(vecs[0], vecs[1]), vecs[2]) > np.pi / 2:
+                vecs = vecs[::-1]
+
+        for vec in vecs:
+            vecs_rotated.append(apply_rotation_vec(vector=vec, angles=diff_angles, matr1=matr1, matr3=matr3,
+                                                   axis=rotation_axis, direction=direction))
+
+        vecs = np.array(vecs_rotated)
+        if self.geometry == 'rectangle':
+            check = check_rectangle_intersection(diff_vectors=diff_vectors, rectangle_vertices=vecs).reshape(-1, 1)
+        else:
+            if self.orientation == 'normal':
+                max_ang_cos = ang_bw_two_vects(vec1=vecs[0, 0], vec2=vecs[1, 0], result='cos')
+                check = check_circle_angle(diff_vectors=diff_vectors, circle_normals=vecs[0],
+                                           max_ang_cos=max_ang_cos).reshape(-1, 1)
+            else:
+                check = check_circle_intersection(diff_vectors=diff_vectors, circle_vectors=vecs[1],
+                                                  circle_normals=vecs[0],
+                                                  origin_to_center=self.vec_origin_to_centre,
+                                                  diameter=self.diameter).reshape(-1, 1)
+        data_output = self._slice_data(data, check, mode)
+        return data_output
+
+    def create_obst_vec_arr(self,
+                            obst_vecs: NDArray[Shape["1, 3"], Float],
+                            diff_angles: NDArray,
+                            rotation_axes: str,
+                            directions_axes: Tuple[int, ...],
+                            initial_axes_angles: Tuple[float, ...],
+                            scan_axis_index: int
+                            ):
+        assert set(rotation_axes).issubset(['x', 'y', 'z']) and rotation_axes != '', 'Wrong rotation axes!'
+        n_obst_vecs = obst_vecs.shape[0]
+        n_angles = len(diff_angles)
+        obst_vecs_ = np.tile(obst_vecs, (n_angles, 1, 1))
+        rot_a = rotation_axes[scan_axis_index]
+        rot_vecs = {'x': np.array([1, 0, 0]),
+                    'y': np.array([0, 1, 0]),
+                    'z': np.array([0, 0, 1])}
+        rot_vec = rot_vecs.get(rot_a)
+        rot_vecs = rot_vec * directions_axes
+        rot_vecs = np.repeat(rot_vecs, repeats=n_obst_vecs, axis=0)
+        rotations = R.from_rotvec(rot_vecs)
+        obst_vecs_ = rotations.apply(obst_vecs_.reshape(-1, 3)).reshape(n_obst_vecs, -1, 3)
+        return obst_vecs_
+
+    def create_obst_vecs(self, ):
+        pass
 
 
 class DiamondAnvil(Ray_obstacle):
@@ -683,18 +743,14 @@ class DiamondAnvil(Ray_obstacle):
                      incident_beam: np.ndarray[float]):
         cos_max_ang = np.cos(np.deg2rad(self.aperture))
         mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
-        n_reflections = diff_vecs.shape[0]
-        angles_deg = np.rad2deg(diff_angles)
-        anvil_normals = np.tile(self.normal, (n_reflections, 1))
         incident_beam = incident_beam / np.linalg.norm(incident_beam).reshape(-1)
         matr1, matr3 = Sample.generate_rotation_matrices(rotations=rotation_axes, directions=directions_axes,
                                                          angle=initial_axes_angles, no_of_scan=scan_axis_index)
-        rotations = R.from_matrix(matr1) * R.from_euler(rotation_axes[scan_axis_index],
-                                                        diff_angles * directions_axes[scan_axis_index]) * R.from_matrix(
-            matr3)
-        anvil_normals = rotations.apply(anvil_normals)
-        cos_bw_incident_norm = (anvil_normals[:, 0] * incident_beam[0] + anvil_normals[:, 1] * incident_beam[1]
-                                + anvil_normals[:, 2] * incident_beam[2])
+        rotation_axis = rotation_axes[scan_axis_index]
+        direction = directions_axes[scan_axis_index]
+        anvil_normals = apply_rotation_vec(vector=self.normal, angles=diff_angles, matr1=matr1, matr3=matr3,
+                                           axis=rotation_axis, direction=direction)
+        cos_bw_incident_norm = ang_bw_two_vects(vec1=anvil_normals, vec2=incident_beam, type='array', result='cos')
         cos_bw_diff_norm = (anvil_normals[:, 0] * diff_vecs[:, 0] + anvil_normals[:, 1] * diff_vecs[:, 1] +
                             anvil_normals[:, 2] * diff_vecs[:, 2])
         mask1 = (np.abs(cos_bw_diff_norm) >= cos_max_ang)
@@ -1153,16 +1209,16 @@ class Sample():
         angle2 = angle2[~np.isnan(angle2)].reshape(-1, 1)
 
         if angle1.shape != (0, 1):
-            diff_vec1 = apply_rotation(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated1,
-                                       angles=angle1, directions=directions, wavelength=wavelength, matr1=matr1,
-                                       matr3=matr3)
+            diff_vec1 = apply_rotation_vecs(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated1,
+                                            angles=angle1, directions=directions, wavelength=wavelength, matr1=matr1,
+                                            matr3=matr3)
         else:
             diff_vec1 = np.array([]).reshape(-1, 3)
 
         if angle2.shape != (0, 1):
-            diff_vec2 = apply_rotation(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated2,
-                                       angles=angle2, directions=directions, wavelength=wavelength, matr1=matr1,
-                                       matr3=matr3)
+            diff_vec2 = apply_rotation_vecs(rotations=rotations, no_of_scan=no_of_scan, hkl_rotated=hkl_rotated2,
+                                            angles=angle2, directions=directions, wavelength=wavelength, matr1=matr1,
+                                            matr3=matr3)
         else:
             diff_vec2 = np.array([]).reshape(-1, 3)
 
@@ -1293,7 +1349,6 @@ class Sample():
                                                                        wavelength=wavelength)
         angles_array[angles_array == 360.] = 0.
         return diff_vecs, hkl_array, hkl_orig_array, angles_array
-
 
     def zenith_azimuth_rev_vect(self,
                                 vector: np.ndarray,
