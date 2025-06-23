@@ -674,6 +674,9 @@ class LinkedObstacle(Ray_obstacle):
             if ang_bw_two_vects(np.cross(vecs[0], vecs[1]), vecs[2]) > np.pi / 2:
                 vecs = vecs[::-1]
 
+        if self.geometry == 'circle' and self.orientation == 'independent':
+            vecs = np.vstack((vecs[1:,:], self.vec_origin_to_centre))
+
         for vec in vecs:
             vecs_rotated.append(apply_rotation_vec(vector=vec, angles=diff_angles, matr1=matr1, matr3=matr3,
                                                    axis=rotation_axis, direction=direction))
@@ -687,9 +690,9 @@ class LinkedObstacle(Ray_obstacle):
                 check = check_circle_angle(diff_vectors=diff_vectors, circle_normals=vecs[0],
                                            max_ang_cos=max_ang_cos).reshape(-1, 1)
             else:
-                check = check_circle_intersection(diff_vectors=diff_vectors, circle_vectors=vecs[1],
+                check = check_circle_intersection(diff_vectors=diff_vectors,
                                                   circle_normals=vecs[0],
-                                                  origin_to_center=self.vec_origin_to_centre,
+                                                  origin_to_center=vecs[1],
                                                   diameter=self.diameter).reshape(-1, 1)
         data_output = self._slice_data(data, check, mode)
         return data_output

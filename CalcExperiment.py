@@ -813,6 +813,7 @@ class Experiment:
                                            all_hkl_orig=self.hkl_origin_in_d_range, visualise=visualise,
                                            trash_unknown=False,
                                            cryst_coord=False, b_matr=self.cell.b_matrix, )
+        print(data[0][0].shape)
         self.known_hkl = fig
         return fig
 
@@ -1091,15 +1092,17 @@ if __name__ == '__main__':
         # [0, 0, 80, -90],
     ]
     sweeps = [
-        360,
+        50,
         # 100,
         # 150
     ]
     rotation_dirs = (-1, -1, 1)
     # aperture = 40
     # anvil_normal = np.array([1., 0., 0.])
-    # exp2.add_linked_obstacle(highest_linked_axis_index=0,distance=40,geometry='circle',orientation='normal',rot=(0,0,0),
+    # exp2.add_linked_obstacle(highest_linked_axis_index=0,width=100,height=100,distance=40,geometry='circle',orientation='independent',rot=(0,0,0),
     #                          displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
+    exp2.add_linked_obstacle(highest_linked_axis_index=0,width=100,height=100,distance=40,geometry='circle',orientation='normal',rot=(0,0,0),
+                             displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle, sweep in zip(angles, sweeps):

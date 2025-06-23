@@ -5,14 +5,12 @@ from rctngl_link_obst import vecs_pass_through_rectangle
 
 def check_circle_intersection(
         diff_vectors: np.ndarray,
-        circle_vectors: np.ndarray,
         circle_normals: np.ndarray,
         origin_to_center: np.ndarray,
         diameter: float
 ) -> np.ndarray:
     return vecs_pass_trough_circle_i(
         np.asarray(diff_vectors, dtype=np.float64),
-        np.asarray(circle_vectors, dtype=np.float64),
         np.asarray(circle_normals, dtype=np.float64),
         np.asarray(origin_to_center, dtype=np.float64),
         float(diameter)
