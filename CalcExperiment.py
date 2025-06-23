@@ -214,6 +214,8 @@ class Experiment:
 
         self.strategy_data_container.clear_data()
         for scan_n, scan in enumerate(self.scans):
+            # print(f'scan n {scan_n}')
+            # print(f'scan prm {scan}')
             data = self.cell.scan(scan_type='???', no_of_scan=scan[4],
                                   scan_sweep=scan[5],
                                   wavelength=self.wavelength,
@@ -239,7 +241,7 @@ class Experiment:
                                             disp_z=scan[7])
 
             for lo in self.linked_obstacles:
-                lo.filter_linked_obstacle(scan_axis_index=scan[4],diff_vectors=data[0],initial_axes_angles=scan[3],
+                data = lo.filter_linked_obstacle(scan_axis_index=scan[4],diff_vectors=data[0],initial_axes_angles=scan[3],
                                           diff_angles=data[3],mode='shade',directions_axes=self.axes_directions,
                                           rotation_axes=self.axes_rotations,data=data)
 
@@ -1070,12 +1072,7 @@ import service_functions as sf
 
 if __name__ == '__main__':
     exp2 = Experiment()
-    # UB = np.array([
-    #     [-0.11849422651445085, 0.0011282219480121245, -0.01823725003496405],
-    #     [-0.01685865323149584, -0.0817301363822078, 0.05102827245551952],
-    #     [-0.01935107006442972, 0.06386615672860567, 0.06568363644621458],
-    # ])
-    parameters = [15, 15, 15, 90.000, 90, 90]
+    parameters = [10, 10, 10, 90., 90., 90.]
     # exp2.set_cell(matr=UB)
     exp2.set_cell(parameters=parameters, om_chi_phi=(0, 0, 0))
     exp2.set_pg('2/m')
@@ -1083,7 +1080,7 @@ if __name__ == '__main__':
     exp2.set_wavelength(0.710730)
     goniometer_system = 'zxz'
     angles = [
-        [0, 54.71, 0],
+        [0., 0., 0.],
 
         # [120, 54.71, 0],
         #
@@ -1101,8 +1098,8 @@ if __name__ == '__main__':
     rotation_dirs = (-1, -1, 1)
     # aperture = 40
     # anvil_normal = np.array([1., 0., 0.])
-    exp2.add_linked_obstacle(highest_linked_axis_index=0,distance=40,geometry='circle',orientation='normal',rot=(0,0,0),
-                             displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
+    # exp2.add_linked_obstacle(highest_linked_axis_index=0,distance=40,geometry='circle',orientation='normal',rot=(0,0,0),
+    #                          displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle, sweep in zip(angles, sweeps):

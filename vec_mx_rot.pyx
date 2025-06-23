@@ -2,13 +2,14 @@
 # cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True
 
 cimport numpy as np
+import numpy as np
 from cython cimport boundscheck, wraparound
 cimport cython
 from libc.math cimport cos, sin
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def apply_rotation_matrix(
+def apply_vec_rotation(
     np.ndarray[np.float64_t, ndim=1] vector,
     np.ndarray[np.float64_t, ndim=1] angles,
     np.ndarray[np.float64_t, ndim=2] matr1,
