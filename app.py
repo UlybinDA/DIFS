@@ -779,6 +779,7 @@ modal4 = html.Div([
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
 fourth_page = html.Div([
+
     html.Div(list(), id='hidden_div_4', style={'display': 'none'}),
     modal4,
     html.Div([
@@ -3171,25 +3172,56 @@ def run_calc_comp_plots(n_clicks, dag_data, d_range):
     return fig, fig, updated_dag, updated_dag, dash.no_update
 
 
-@app.callback(
-    Output('diff_map_detector', 'columnDefs'),
-    Input('diff_map_detector', 'cellValueChanged'),
-    State('diff_map_detector', 'columnDefs'),
+app.clientside_callback(
+    """
+    async function(cellValueChanges) {
+        if (!cellValueChanges || cellValueChanges.length === 0) {
+            return window.dash_clientside.no_update;
+        }
+
+        try {
+            const gridApi = await dash_ag_grid.getApiAsync("diff_map_detector");
+
+            if (!gridApi || typeof gridApi.setColumnsVisible !== 'function') {
+                console.warn('Grid API not available');
+                return window.dash_clientside.no_update;
+            }
+
+            for (const change of cellValueChanges) {
+                if (change.colId === 'orientation') {
+                    const newVisibility = change.value === 'independent';
+
+                    if (!gridApi.getModel() || !gridApi.getColumnDef('disp_y')) {
+                        console.warn('Grid not ready, retrying...');
+                        setTimeout(() => {
+                            gridApi.setColumnsVisible(['disp_y','disp_z'], newVisibility);
+                        }, 300);
+                        return window.dash_clientside.no_update;
+                    }
+
+                    try {
+                        gridApi.setColumnsVisible(['disp_y','disp_z'], newVisibility);
+                    } catch (innerError) {
+                        console.error('First try failed:', innerError);
+                        setTimeout(() => {
+                            try {
+                                gridApi.setColumnsVisible(['disp_y','disp_z'], newVisibility);
+                            } catch (finalError) {
+                                console.error('Final error:', finalError);
+                            }
+                        }, 300);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Callback error:', error);
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('diff_map_detector', 'id'),  # Фиктивный выход
+    Input('diff_map_detector', 'cellValueChanged')
 )
-@mylogger(level='DEBUG')
-def hide_columns_map_detector(changed_cell, coldefs):
-    if not changed_cell or changed_cell[0]['colId'] != 'orientation':
-        return no_upd
-
-    new_coldefs = copy.deepcopy(coldefs)
-    hide_columns = changed_cell[0]['value'] == 'normal'
-
-    for col in new_coldefs:
-        if col['field'] in ['disp_y', 'disp_z']:
-            col['hide'] = hide_columns
-            col.pop('headerClass', None)
-
-    return new_coldefs
 
 
 if __name__ == '__main__':

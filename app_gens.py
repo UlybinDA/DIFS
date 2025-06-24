@@ -627,6 +627,7 @@ def get_diff_map_detector(id_):
             """
                 },
             },
+
             columnDefs=[
                 {
                     "field": "factor_collision",
@@ -689,24 +690,18 @@ def get_diff_map_detector(id_):
                 {
                     "field": "disp_y",
                     "headerName": "Disp y",
-                    "editable": {
-                        "function": "params.data.orientation === 'independent' && Object.prototype.toString.call(params.data.geometry) === '[object String]'"},
+                    # "editable": {
+                    #     "function": "params.data.orientation === 'independent' && Object.prototype.toString.call(params.data.geometry) === '[object String]'"},
                     "width": 80,
-                    "cellClassRules":{
-                        "hide-cell": "params.data.orientation === 'normal'"
-                    },
-                    'headerClass':"hide-cell",
+                    "hide": True,
                 },
                 {
                     "field": "disp_z",
                     "headerName": "Disp z",
-                    "editable": {
-                        "function": "params.data.orientation === 'independent' && Object.prototype.toString.call(params.data.geometry) === '[object String]'"},
+                    # "editable": {
+                    #     "function": "params.data.orientation === 'independent' && Object.prototype.toString.call(params.data.geometry) === '[object String]'"},
                     "width": 80,
-                    "cellClassRules": {
-                        "hide-cell": "params.data.orientation === 'normal'"
-                    },
-                    'headerClass':"hide-cell",
+                    "hide": True,
 
                 },
 
