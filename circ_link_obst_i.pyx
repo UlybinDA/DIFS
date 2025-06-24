@@ -52,7 +52,7 @@ def vecs_pass_trough_circle_i(
         n_dot_v = nx * vx + ny * vy + nz * vz
         n_dot_c = nx * cx + ny * cy + nz * cz
 
-        if fabs(n_dot_v) < EPS:
+        if fabs(n_dot_v) < EPS: #vec parallel to plane
             if fabs(n_dot_c) < EPS:
                 cross_x = cy * vz - cz * vy
                 cross_y = cz * vx - cx * vz
@@ -71,6 +71,7 @@ def vecs_pass_trough_circle_i(
         else:
             t = n_dot_c / n_dot_v
             if t < 0:
+                check_view[i] = 0
             else:
                 px = t * vx
                 py = t * vy
