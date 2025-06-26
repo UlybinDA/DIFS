@@ -1,6 +1,6 @@
 import numpy as np
 
-from  hkl_pg_generation import generate_hkl_symmetry_cython
+from  services.hkl_pg_generation import generate_hkl_symmetry_cython
 
 def _generate_hkl_by_pg(hkl_orig_array,general_positions):
     hkl_orig_array = hkl_orig_array.astype(np.float32)

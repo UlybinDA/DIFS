@@ -1,7 +1,7 @@
 import numpy as np
-from circ_link_obst_i import vecs_pass_trough_circle_i
-from circ_link_obst_n import vecs_pass_through_circle
-from rctngl_link_obst import vecs_pass_through_rectangle
+from services.circ_link_obst_i import vecs_pass_trough_circle_i
+from services.circ_link_obst_n import vecs_pass_through_circle
+from services.rctngl_link_obst import vecs_pass_through_rectangle
 
 def check_circle_intersection(
         diff_vectors: np.ndarray,

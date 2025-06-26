@@ -1,5 +1,5 @@
-from rotation import apply_rotation_matrix
-from vec_mx_rot import apply_vec_rotation
+from services.rotation import apply_rotation_matrix
+from services.vec_mx_rot import apply_vec_rotation
 import numpy as np
 
 axes_dict = {'x': 0, 'y': 1, 'z': 2}

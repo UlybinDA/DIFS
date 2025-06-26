@@ -1,25 +1,24 @@
 from json import JSONDecodeError
-from Exceptions import *
+from services.exceptions.exceptions import *
 from dash import Dash, dash_table, html, dcc, callback, Input, Output, State, MATCH, ALL, Patch
 from dash import no_update as no_upd
 from dash.dash_table.Format import Format, Scheme, Sign, Symbol
 import pandas as pd
 import dash
 from os import listdir
-import service_functions as sf
-from Modals_content import *
-from CalcExperiment import Experiment
+import services.service_functions as sf
+from assets.modals_content import *
+from experiment.experiment import Experiment
 import numpy as np
 import dash_bootstrap_components as dbc
-from pointsymmetry import PG_KEYS, CENTRINGS
+from symmetry.pointsymmetry import PG_KEYS, CENTRINGS
 from dash_extensions import Keyboard
-import app_gens as apg
+import assets.app_gens as apg
 import json
-from my_logger import mylogger
+from logger.my_logger import mylogger
 import os
-import dash_ag_grid as dag
 import copy
-from main import Sample
+from sample.sample import Sample
 
 css_path = os.path.join(os.path.dirname(__file__), 'assets', 'style_main.css')
 goniometer_models_path = os.path.join(os.path.dirname(__file__), 'instruments', 'goniometers')
