@@ -1,8 +1,8 @@
 from json import JSONDecodeError
 from services.exceptions.exceptions import *
-from dash import Dash, dash_table, html, dcc, callback, Input, Output, State, MATCH, ALL, Patch
+from dash import Dash, dash_table, html, dcc, callback, Input, Output, State, ALL, Patch, MATCH, ctx
 from dash import no_update as no_upd
-from dash.dash_table.Format import Format, Scheme, Sign, Symbol
+from dash.dash_table.Format import Format, Scheme
 import pandas as pd
 import dash
 from os import listdir
@@ -42,24 +42,24 @@ ZIPPED_LOG_FILE = "app_log.zip"
 class Content_variables():
     def __init__(self):
         self.df_matr = pd.DataFrame(
-            {'a*': [1, 0, 0],
-             'b*': [0, 1, 0],
-             'c*': [0, 0, 1]
+            {'a*': [1., 0., 0.],
+             'b*': [0., 1., 0.],
+             'c*': [0., 0., 1.]
              }).to_dict('records')
         self.df_parameters = pd.DataFrame({
-            'a': [1, ],
-            'b': [1, ],
-            'c': [1, ],
-            'alpha': [90, ],
-            'beta': [90, ],
-            'gamma': [90, ],
-            'omega': [0, ],
-            'chi': [0, ],
-            'phi': [0, ]}).to_dict('records')
+            'a': [10., ],
+            'b': [10., ],
+            'c': [10., ],
+            'alpha': [90., ],
+            'beta': [90., ],
+            'gamma': [90., ],
+            'omega': [0., ],
+            'chi': [0., ],
+            'phi': [0., ]}).to_dict('records')
         self.df_matr_transform = pd.DataFrame(
-            {'TM1': [1, 0, 0],
-             'TM2': [0, 1, 0],
-             'TM3': [0, 0, 1]
+            {'TM1': [1., 0., 0.],
+             'TM2': [0., 1., 0.],
+             'TM3': [0., 0., 1.]
              }).to_dict('records')
         self.goniometer_table = pd.DataFrame(
             columns=('rotation', 'direction', 'name', 'real', 'angle')).to_dict('records')
@@ -700,7 +700,42 @@ second_page = html.Div([
     ], ),
     html.Div(list(),
              id='obstacle_div'
+             ),
+    html.Div([html.H4('Goniometer linked beam obstacles'),
+              html.Button(
+                  'Add obstacle',
+                  id='add_linked_obstacle_button',
+                  n_clicks=0
+              ),
+              html.Button(
+                  'Delete all obstacles',
+                  id='clear_linked_obstacles_button',
+                  n_clicks=0
+              ),
+              html.Button(
+                  'Set obstacles',
+                  id='set_linked_obstacles_button',
+                  n_clicks=0
+              ),
+              html.Button('Export obstacles input',
+                          id='download_linked_obstacles_btn',
+                          n_clicks=0,
+                          style={
+                              'vertical-align': 'top',
+                              'display': 'inline-block',
+                              'height': '30px',
+                          }
+                          ),
+              dcc.Download(id='download_linked_obstacles', ),
+              dcc.Upload(html.Button('Import obstacles', style={'display': 'inline-block'}),
+                         id='upload_linked_obstacles',
+                         accept='.json', multiple=False, max_size=10000),
+
+              ]),
+    html.Div(list(),
+             id='linked_obstacle_div'
              )
+
 ]
 )
 
@@ -1061,6 +1096,7 @@ app.layout = html.Div([dcc.Location(id="url"),
                        dcc.Store(data=None, id='stored_circle_parameters', storage_type=STORE_TYPE),
                        dcc.Store(data=None, id='stored_rectangle_parameters', storage_type=STORE_TYPE),
                        dcc.Store(data=None, id='stored_obstacles_div', storage_type=STORE_TYPE),
+                       dcc.Store(data=None, id='stored_linked_obstacles_div', storage_type=STORE_TYPE),
                        dcc.Store(data=0, id='stored_obstacle_num', storage_type=STORE_TYPE),
                        dcc.Store(data=None, id='stored_anvil_normal_data', storage_type=STORE_TYPE),
                        dcc.Store(data=None, id='stored_anvil_aperture_data', storage_type=STORE_TYPE),
@@ -1151,6 +1187,9 @@ def get_stored_home_page_data(flag, UB_table, parameters_table):
     return output_list
 
 
+# stored_linked_obstacles_div
+# linked_obstacle_div
+
 @app.callback(
     Output('wavelength_input', 'value', allow_duplicate=True),
     Output('Goniometer_table', 'data'),
@@ -1164,6 +1203,7 @@ def get_stored_home_page_data(flag, UB_table, parameters_table):
     Output('anvil_normal_vector_table', 'data'),
     Output('anvil_aperture_input', 'value'),
     Output('calc_anvil_check', 'value'),
+    Output('linked_obstacle_div', 'children', allow_duplicate=True),
     Output("page-1_stored_flag", "data", allow_duplicate=True),
     Input("page-1_stored_flag", "data"),
     State('stored_wavelength_val', 'data'),
@@ -1178,13 +1218,15 @@ def get_stored_home_page_data(flag, UB_table, parameters_table):
     State('stored_anvil_normal_data', 'data'),
     State('stored_anvil_aperture_data', 'data'),
     State('stored_anvil_calc_check', 'data'),
+    State('stored_linked_obstacles_div', 'data'),
     prevent_initial_call=True)
 @mylogger(level='DEBUG')
 def get_stored_page_1_data(flag, wavelength_val, goniometer_table, goniometer_dropdown, detector_dropdown,
                            detector_check_complex, circle_parameters, rectangle_parameters, obstacle_div,
-                           log_col_check, anvil_normal, anvil_aperture, anvil_check):
+                           log_col_check, anvil_normal, anvil_aperture, anvil_check, linked_obstacle_div):
     if not flag:
         raise dash.exceptions.PreventUpdate()
+    print(linked_obstacle_div)
     storage_data_list = [wavelength_val,
                          goniometer_table,
                          goniometer_dropdown,
@@ -1196,7 +1238,8 @@ def get_stored_page_1_data(flag, wavelength_val, goniometer_table, goniometer_dr
                          log_col_check,
                          anvil_normal,
                          anvil_aperture,
-                         anvil_check
+                         anvil_check,
+                         linked_obstacle_div,
                          ]
     output_list = [if_val_None_return_no_upd_else_return(val) for val in storage_data_list]
     output_list += [False, ]
@@ -1634,8 +1677,7 @@ def generate_obstacle(n_cl, children, table_num):
     if n_cl == 0:
         raise dash.exceptions.PreventUpdate()
     new_div_table = apg.generate_obst_table(table_num)
-    new_children = children.copy()
-    new_children += [new_div_table, ]
+    new_children = children.copy() + [new_div_table]
     table_num += 1
     return new_children, table_num
 
@@ -1836,7 +1878,13 @@ def check_anvil(check):
         exp1.calc_anvil_flag = True
     return check
 
-
+    # extracted_obstacles = []
+    # for obst in children:
+    #     extracted_obstacle = sf.remake_obstacle_dict(obst[0])
+    #     extracted_obstacles.append(extracted_obstacle)
+    #     obst_is_corr = sf.check_obstacle_dict(extracted_obstacle, True)
+    #     if not obst_is_corr: return {'background-color': 'red'}, no_upd
+    # for obst in extracted_obstacles:
 @callback(
     Output('set_obstacles_button', 'style'),
     Output('stored_obstacles_div', 'data', allow_duplicate=True),
@@ -1850,14 +1898,14 @@ def check_anvil(check):
 def set_obstacles(n_clicks, children, obst_div):
     if n_clicks == 0:
         raise dash.exceptions.PreventUpdate()
+    extracted_obstacles = []
     for obst in children:
-        obst = sf.remake_obstacle_dict(obst[0])
-        print(obst)
-        obst_is_corr = sf.check_obstacle_dict(obst)
+        extracted_obstacle = sf.remake_obstacle_dict(obst[0])
+        extracted_obstacles.append(extracted_obstacle)
+        obst_is_corr = sf.check_obstacle_dict(extracted_obstacle, False)
         if not obst_is_corr: return {'background-color': 'red'}, no_upd
-
-    for obst in children:
-        obst = sf.remake_obstacle_dict(obst[0])
+    exp1.clear_obstacles()
+    for obst in extracted_obstacles:
         rot = (obst['rotation_x'], obst['rotation_y'], obst['rotation_z'])
         obst.pop('rotation_x')
         obst.pop('rotation_y')
@@ -1866,18 +1914,16 @@ def set_obstacles(n_clicks, children, obst_div):
     return {'background-color': 'green'}, obst_div
 
 
-@callback(Input('clear_obstacles_button', 'n_clicks'))
+@callback(Output('stored_obstacles_div', 'data', allow_duplicate=True),
+          Input('clear_obstacles_button', 'n_clicks'),
+          prevent_initial_call=True
+          )
 @mylogger(level='DEBUG')
 def delete_obstacles(n_clicks):
     if n_clicks == 0:
         raise dash.exceptions.PreventUpdate()
-    try:
-        num_of_obstacles = len(exp1.obstacles)
-    except AttributeError:
-        raise dash.exceptions.PreventUpdate()
-
-    for i in range(num_of_obstacles):
-        exp1.delete_obstacle(0)
+    exp1.clear_obstacles()
+    return None
 
 
 @callback(Output('download_obstacles', 'data'),
@@ -3055,7 +3101,7 @@ def calc_1d_section(relayoutdata, map_type, data_container, fig):
     hkl_encoded = reflections_encoded[0]
     hkl_orig_encoded = reflections_encoded[1]
     min_, max_, range_ = Sample.angle_range(start_rad=start_angle, end_rad=end_angle)
-    mask = Sample.angles_in_sweep(angles_array=diff_angles,sweep_type=range_,start=min_,end=max_,return_bool=True )
+    mask = Sample.angles_in_sweep(angles_array=diff_angles, sweep_type=range_, start=min_, end=max_, return_bool=True)
     hkl_encoded = hkl_encoded[mask]
     hkl_orig_encoded = hkl_orig_encoded[mask]
 
@@ -3218,10 +3264,103 @@ app.clientside_callback(
         return window.dash_clientside.no_update;
     }
     """,
-    Output('diff_map_detector', 'id'),  # Фиктивный выход
+    Output('diff_map_detector', 'id'),
     Input('diff_map_detector', 'cellValueChanged')
 )
 
+
+@callback(
+    Output({'type': 'obstacle_table', 'index': MATCH}, 'hidden_columns'),
+    Input({'type': 'obstacle_table', 'index': ALL}, 'data'),
+    prevent_initial_call=True
+)
+def obst_table_hidden_control(data_):
+    data_changed = ctx.triggered[0]['value'][0]
+    table_index = sf.find_index_digit(tuple(data_changed.keys())[0])
+    hidden_columns = sf.prepare_hidden_columns(table_index, data_changed)
+    return hidden_columns
+
+
+@callback(
+    Output({'type': 'linked_obstacle_table', 'index': MATCH}, 'hidden_columns'),
+    Input({'type': 'linked_obstacle_table', 'index': ALL}, 'data'),
+    prevent_initial_call=True
+)
+def obst_table_hidden_control(data_):
+    data_changed = ctx.triggered[0]['value'][0]
+    table_index = sf.find_index_digit(tuple(data_changed.keys())[0])
+    hidden_columns = sf.prepare_hidden_columns(table_index, data_changed)
+    return hidden_columns
+
+
+@callback(
+    Output('linked_obstacle_div', 'children', allow_duplicate=True),
+    Output('stored_obstacle_num', 'data', allow_duplicate=True),
+    Input('add_linked_obstacle_button', 'n_clicks'),
+    State('linked_obstacle_div', 'children'),
+    State('stored_obstacle_num', 'data'),
+    prevent_initial_call=True
+
+)
+def generate_linked_obstacle(n_cl, children, table_num):
+    if n_cl == 0:
+        raise dash.exceptions.PreventUpdate()
+    if not exp1.axes_rotations:
+        raise dash.exceptions.PreventUpdate()
+    axes_dict = {key: val for key, val in enumerate(exp1.axes_names)}
+    new_div_table = apg.generate_obst_table(table_num, linked=True, axes_dict=axes_dict)
+    new_children = children.copy() + [new_div_table]
+    table_num += 1
+    return new_children, table_num
+
+
+@callback(Output('stored_linked_obstacles_div', 'data', allow_duplicate=True),
+          Input('clear_linked_obstacles_button', 'n_clicks'),
+          prevent_initial_call=True
+          )
+@mylogger(level='DEBUG')
+def delete_obstacles(n_clicks):
+    if n_clicks == 0:
+        raise dash.exceptions.PreventUpdate()
+    exp1.clear_linked_obstacles()
+    return None
+
+
+@callback(
+    Output('set_linked_obstacles_button', 'style'),
+    Output('stored_linked_obstacles_div', 'data', allow_duplicate=True),
+    Input('set_linked_obstacles_button', 'n_clicks'),
+    State({'type': 'linked_obstacle_table', 'index': ALL}, 'data'),
+    State('linked_obstacle_div', 'children'),
+    prevent_initial_call=True
+)
+@mylogger(level='DEBUG')
+def set_linked_obstacles(n_clicks, children, obst_div):
+    if n_clicks == 0:
+        raise dash.exceptions.PreventUpdate()
+    extracted_obstacles = []
+    for obst in children:
+        extracted_obstacle = sf.remake_obstacle_dict(obst[0])
+        extracted_obstacles.append(extracted_obstacle)
+        obst_is_corr = sf.check_obstacle_dict(extracted_obstacle, True)
+        if not obst_is_corr: return {'background-color': 'red'}, no_upd
+    exp1.clear_linked_obstacles()
+    for obst in extracted_obstacles:
+        rot = (obst['rotation_x'], obst['rotation_y'], obst['rotation_z'])
+        obst.pop('rotation_x')
+        obst.pop('rotation_y')
+        obst.pop('rotation_z')
+        exp1.add_linked_obstacle(**obst, rot=rot)
+    return {'background-color': 'green'}, obst_div
+
+@callback(Output('download_linked_obstacles', 'data'),
+          Input('download_linked_obstacles_btn', 'n_clicks'))
+@mylogger(level='DEBUG')
+def download_linked_obstacles(n_clicks):
+    if n_clicks == 0:
+        raise dash.exceptions.PreventUpdate()
+    data_json = exp1.json_export('linked_obstacles')
+    return dict(content=data_json, filename='linked_obstacles_input.json')
 
 if __name__ == '__main__':
     app.run(debug=True, )

@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
-import re
 import random
 import services.rgb_colors as rgb_colors
 from sample.sample import Sample
@@ -17,6 +16,9 @@ from services.exceptions.exceptions import RunsDictError, HKLFormatError, WrongH
 from assets.modals_content import *
 from services.encode_hkl import encode_hkl
 from typing import Tuple, List, Dict, Union, Optional, Any
+import re
+from obstacles.obstacle import Ray_obstacle
+from obstacles.linked_obstacle import LinkedObstacle
 
 
 def load_hklf4(hkl_str: str, trash_zero: bool = True) -> np.ndarray:
@@ -1419,6 +1421,22 @@ def generate_dicts_for_obst(exp_inst: Any) -> List[Dict[str, Any]]:
         obst_dicts.append(obstacle_dict)
     return obst_dicts
 
+def generate_dicts_for_linked_obst(exp_inst: Any) -> List[Dict[str, Any]]:
+    if not isinstance(exp_inst, Experiment):
+        raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
+    dummy = [[*[None, ] * 9, [None, None, None], None], ]
+    obstacle_list = exp_inst.linked_obstacles if exp_inst.linked_obstacles else dummy
+    obstacle_parameters = ['distance', 'geometry', 'orientation', 'displacement_y', 'displacement_z', 'height', 'width',
+                           'diameter','linked_axis', 'rotation_x', 'rotation_y', 'rotation_z', 'name']
+    obst_dicts = []
+    for obst in obstacle_list:
+        assert isinstance(obst, LinkedObstacle)
+        obst = [obst.dist,obst.geometry,obst.orientation,obst.disp_y,obst.disp_z, obst.height,obst.width, obst.diameter,
+                obst.highest_linked_axis_index,*obst.rot,obst.name]
+        obstacle_dict = dict(zip(obstacle_parameters, obst))
+        obst_dicts.append(obstacle_dict)
+    return obst_dicts
+
 
 def check_goniometer_dict(dict_: Dict[str, Any]) -> bool:
     if not dict_has_keys(dict_, ['axes_names', 'axes_directions', 'axes_rotations', 'axes_angles', 'axes_real']):
@@ -1634,7 +1652,7 @@ def find_index(s: str, x: str, n: int) -> Optional[int]:
     return None
 
 
-def check_obstacle_dict(dict_: Dict[str, Any]) -> bool:
+def check_obstacle_dict(dict_: Dict[str, Any], linked=False) -> bool:
     if not (check_dict_value(dict_, ['geometry', 'orientation'], classes=str, check_pos_value=False)
             and check_dict_value(dict_, ['distance', 'rotation_y', 'rotation_x', 'rotation_z'], check_pos_value=False,
                                  classes=(int, float))): return False
@@ -1649,6 +1667,9 @@ def check_obstacle_dict(dict_: Dict[str, Any]) -> bool:
             return False
     elif dict_['geometry'] == 'rectangle':
         if not check_dict_value(dict_, ['width', 'height'], classes=(float, int)):
+            return False
+    if linked:
+        if not check_dict_value(dict_,['linked_axis'],classes=int):
             return False
     return True
 
@@ -2142,6 +2163,25 @@ def generate_random_hex_colors(num_colors):
         hex_color = "#{:06x}".format(r << 16 | g << 8 | b)
         hex_colors.append(hex_color)
     return hex_colors
+
+
+def find_index_digit(str_):
+    pattern = r'[A-Za-z_]*(\d+).*'
+    index = re.match(pattern, str_)[1]
+    return index
+
+
+def prepare_hidden_columns(table_index, data):
+    hidden_columns = []
+    if data['obst_prm_' + table_index + '_geometry'] == 'rectangle':
+        hidden_columns.append('obst_prm_' + table_index + '_diameter')
+    else:
+        hidden_columns.append('obst_prm_' + table_index + '_height')
+        hidden_columns.append('obst_prm_' + table_index + '_width')
+    if data['obst_prm_' + table_index + '_orientation'] == 'normal':
+        hidden_columns.append('obst_prm_' + table_index + '_displacement_y')
+        hidden_columns.append('obst_prm_' + table_index + '_displacement_z')
+    return hidden_columns
 
 
 if __name__ == '__main__':

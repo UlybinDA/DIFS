@@ -50,65 +50,134 @@ def generate_angle_table(exp_inst, id_, style, style_cell):
     return input_angles_table
 
 
-def generate_obst_table(n_cl, data=None):
+def generate_obst_table(n_cl, data=None, linked=False, axes_dict=None):
+    print(axes_dict)
+    if linked:
+        type_ = 'linked_obstacle_table'
+    else:
+        type_ = 'obstacle_table'
     if not data:
+        if linked:
+
+            data = pd.DataFrame({f'obst_prm_{n_cl}_distance': 10,
+                                 f'obst_prm_{n_cl}_geometry': 'rectangle',
+                                 f'obst_prm_{n_cl}_orientation': 'normal',
+                                 f'obst_prm_{n_cl}_rotation_x': 0,
+                                 f'obst_prm_{n_cl}_rotation_y': 0,
+                                 f'obst_prm_{n_cl}_rotation_z': 0,
+                                 f'obst_prm_{n_cl}_height': '',
+                                 f'obst_prm_{n_cl}_width': '',
+                                 f'obst_prm_{n_cl}_diameter': '',
+                                 f'obst_prm_{n_cl}_displacement_y': '',
+                                 f'obst_prm_{n_cl}_displacement_z': '',
+                                 f'obst_prm_{n_cl}_name': '',
+                                 f'obst_prm_{n_cl}_linked_axis': 0,
+                                 }, index=[0]).to_dict('records')
+            columns = [
+                {'id': f'obst_prm_{n_cl}_distance', 'name': 'x',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_geometry', 'name': 'geometry', 'type': 'text',
+                 'presentation': 'dropdown'},
+                {'id': f'obst_prm_{n_cl}_orientation', 'name': 'orientation',
+                 'type': 'text', 'presentation': 'dropdown'},
+                {'id': f'obst_prm_{n_cl}_rotation_x', 'name': 'rotation_x',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_rotation_y', 'name': 'rotation_y',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_rotation_z', 'name': 'rotation_z',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_height', 'name': 'height',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_width', 'name': 'width',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_diameter', 'name': 'diameter',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_displacement_y', 'name': 'y',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_displacement_z', 'name': 'z',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_name', 'name': f'name',
+                 'type': 'text'},
+                {'id': f'obst_prm_{n_cl}_linked_axis', 'name': 'linked axis',
+                 'type': 'numeric', 'presentation': 'dropdown'}
+            ]
+            dropdown = {
+                f'obst_prm_{n_cl}_geometry': {
+                    'options': [{'label': 'Circle', 'value': 'circle'},
+                                {'label': 'Rectangle', 'value': 'rectangle'}]},
+                f'obst_prm_{n_cl}_orientation': {
+                    'options': [{'label': 'Normal', 'value': 'normal'},
+                                {'label': 'Independent', 'value': 'independent'}]},
+                f'obst_prm_{n_cl}_linked_axis': {
+                    'options': [{'label': val, 'value': key} for key, val in axes_dict.items()]
+                }
+            }
+        else:
+            data = pd.DataFrame(
+                {f'obst_prm_{n_cl}_distance': 10,
+                 f'obst_prm_{n_cl}_geometry': 'rectangle',
+                 f'obst_prm_{n_cl}_orientation': 'normal',
+                 f'obst_prm_{n_cl}_rotation_x': 0,
+                 f'obst_prm_{n_cl}_rotation_y': 0,
+                 f'obst_prm_{n_cl}_rotation_z': 0,
+                 f'obst_prm_{n_cl}_height': '',
+                 f'obst_prm_{n_cl}_width': '',
+                 f'obst_prm_{n_cl}_diameter': '',
+                 f'obst_prm_{n_cl}_displacement_y': '',
+                 f'obst_prm_{n_cl}_displacement_z': '',
+                 f'obst_prm_{n_cl}_name': ''
+                 }, index=[0]).to_dict('records')
+            columns = [
+                {'id': f'obst_prm_{n_cl}_distance', 'name': 'distance',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_geometry', 'name': 'geometry', 'type': 'text',
+                 'presentation': 'dropdown'},
+                {'id': f'obst_prm_{n_cl}_orientation', 'name': 'orientation',
+                 'type': 'text', 'presentation': 'dropdown'},
+                {'id': f'obst_prm_{n_cl}_rotation_x', 'name': 'rotation_x',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_rotation_y', 'name': 'rotation_y',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_rotation_z', 'name': 'rotation_z',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_height', 'name': 'height',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_width', 'name': 'width',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_diameter', 'name': 'diameter',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_displacement_y', 'name': 'displacement y',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_displacement_z', 'name': 'displacement z',
+                 'type': 'numeric', 'format': Format(precision=6)},
+                {'id': f'obst_prm_{n_cl}_name', 'name': f'name',
+                 'type': 'text'}]
+            dropdown = {
+                f'obst_prm_{n_cl}_geometry': {
+                    'options': [{'label': 'Circle', 'value': 'circle'},
+                                {'label': 'Rectangle', 'value': 'rectangle'}]},
+                f'obst_prm_{n_cl}_orientation': {
+                    'options': [{'label': 'Normal', 'value': 'normal'},
+                                {'label': 'Independent', 'value': 'independent'}]},
+
+            }
+
         new_div_table = html.Div([
             html.Div([dash_table.DataTable(fill_width=False,
-                                           id={'type': 'obstacle_table', 'index': n_cl},
+                                           id={'type': type_, 'index': n_cl},
                                            editable=True,
                                            style_cell={
                                                'width': '100px'
                                            },
-                                           data=pd.DataFrame(
-                                               {f'obst_prm_{n_cl}_distance': 10,
-                                                f'obst_prm_{n_cl}_geometry': '',
-                                                f'obst_prm_{n_cl}_orientation': 'normal',
-                                                f'obst_prm_{n_cl}_rotation_x': 0,
-                                                f'obst_prm_{n_cl}_rotation_y': 0,
-                                                f'obst_prm_{n_cl}_rotation_z': 0,
-                                                f'obst_prm_{n_cl}_height': '',
-                                                f'obst_prm_{n_cl}_width': '',
-                                                f'obst_prm_{n_cl}_diameter': '',
-                                                f'obst_prm_{n_cl}_displacement_y': '',
-                                                f'obst_prm_{n_cl}_displacement_z': '',
-                                                f'obst_prm_{n_cl}_name': ''
-                                                }, index=[0])
-                                           .to_dict('records'),
-                                           columns=[
-                                               {'id': f'obst_prm_{n_cl}_distance', 'name': 'distance',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_geometry', 'name': 'geometry', 'type': 'text',
-                                                'presentation': 'dropdown'},
-                                               {'id': f'obst_prm_{n_cl}_orientation', 'name': 'orientation',
-                                                'type': 'text', 'presentation': 'dropdown'},
-                                               {'id': f'obst_prm_{n_cl}_rotation_x', 'name': 'rotation_x',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_rotation_y', 'name': 'rotation_y',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_rotation_z', 'name': 'rotation_z',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_height', 'name': 'height',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_width', 'name': 'width',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_diameter', 'name': 'diameter',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_displacement_y', 'name': 'displacement y',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_displacement_z', 'name': 'displacement z',
-                                                'type': 'numeric', 'format': Format(precision=6)},
-                                               {'id': f'obst_prm_{n_cl}_name', 'name': f'name',
-                                                'type': 'text'}
-                                           ],
-                                           dropdown={
-                                               f'obst_prm_{n_cl}_geometry': {
-                                                   'options': [{'label': 'Circle', 'value': 'circle'},
-                                                               {'label': 'Rectangle', 'value': 'rectangle'}]},
-                                               f'obst_prm_{n_cl}_orientation': {
-                                                   'options': [{'label': 'Normal', 'value': 'normal'},
-                                                               {'label': 'Independent', 'value': 'independent'}]},
-
-                                           },
+                                           data=data,
+                                           columns=columns,
+                                           dropdown=dropdown,
+                                           hidden_columns=[f'obst_prm_{n_cl}_displacement_y',
+                                                           f'obst_prm_{n_cl}_displacement_z',
+                                                           # f'obst_prm_{n_cl}_height',
+                                                           # f'obst_prm_{n_cl}_width',
+                                                           f'obst_prm_{n_cl}_diameter',
+                                                           ],
                                            )],
                      style={'display': 'inline-block'}
                      ),
@@ -125,7 +194,7 @@ def generate_obst_table(n_cl, data=None):
     else:
         new_div_table = html.Div([
             html.Div([dash_table.DataTable(fill_width=False,
-                                           id={'type': 'obstacle_table', 'index': n_cl},
+                                           id={'type': type_, 'index': n_cl},
                                            editable=True,
                                            style_cell={
                                                'width': '100px'
@@ -193,6 +262,7 @@ def generate_obst_table(n_cl, data=None):
         ],
             id={'type': 'obstacle_div_table'}
         )
+    print(new_div_table)
     return new_div_table
 
 
@@ -599,7 +669,8 @@ def get_range_dag(id_):
         style={"display": "inline-block", "padding": "2px"},
     )
 
-@mylogger('DEBUG',log_args=True)
+
+@mylogger('DEBUG', log_args=True)
 def get_diff_map_detector(id_):
     df = pd.DataFrame({
         'factor_collision': [False],
@@ -615,7 +686,7 @@ def get_diff_map_detector(id_):
     })
     return html.Div(
         dag.AgGrid(
-            style={'width':1000,'height':85},
+            style={'width': 1000, 'height': 85},
             id=id_,
             dashGridOptions={
                 "onGridReady": {
@@ -710,4 +781,3 @@ def get_diff_map_detector(id_):
 
         )
     )
-

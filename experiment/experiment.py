@@ -66,7 +66,6 @@ class Experiment:
             'orientation matrix and parameters are entered, only matrix will be used ')
         if matr is not None:
             self.cell = Sample(orient_matx=matr)
-            print(matr)
             self.parameters = self.cell.parameters
         else:
             self.parameters = parameters
@@ -142,11 +141,12 @@ class Experiment:
         except AttributeError:
             warnings.warn('List of constant obstacles is empty')
 
-    def add_linked_obstacle(self,highest_linked_axis_index, distance, geometry, orientation, rot, displacement_y=None, displacement_z=None, height=None,
-                      width=None, diameter=None, name='',):
-        lo = LinkedObstacle(dist=distance,geometry=geometry,orientation=orientation,rot=rot,
-                                         disp_y=displacement_y,disp_z=displacement_z,height=height,width=width,name=name,
-                                         diameter=diameter,highest_linked_axis_index=highest_linked_axis_index)
+    def add_linked_obstacle(self, linked_axis, distance, geometry, orientation, rot, displacement_y=None,
+                            displacement_z=None, height=None,
+                            width=None, diameter=None, name='', ):
+        lo = LinkedObstacle(dist=distance, geometry=geometry, orientation=orientation, rot=rot,
+                            disp_y=displacement_y, disp_z=displacement_z, height=height, width=width, name=name,
+                            diameter=diameter, highest_linked_axis_index=linked_axis)
         self.linked_obstacles.append(lo)
 
     def add_scan(self, det_dist, det_angles, det_orientation, axes_angles, scan, sweep, det_disp_y=None,
@@ -215,8 +215,6 @@ class Experiment:
 
         self.strategy_data_container.clear_data()
         for scan_n, scan in enumerate(self.scans):
-            # print(f'scan n {scan_n}')
-            # print(f'scan prm {scan}')
             data = self.cell.scan(scan_type='???', no_of_scan=scan[4],
                                   scan_sweep=scan[5],
                                   wavelength=self.wavelength,
@@ -242,10 +240,11 @@ class Experiment:
                                             disp_z=scan[7])
 
             for lo in self.linked_obstacles:
-                data = lo.filter_linked_obstacle(scan_axis_index=scan[4],diff_vectors=data[0],initial_axes_angles=scan[3],
-                                          diff_angles=data[3],mode='shade',directions_axes=self.axes_directions,
-                                          rotation_axes=self.axes_rotations,data=data)
-
+                data = lo.filter_linked_obstacle(scan_axis_index=scan[4], diff_vectors=data[0],
+                                                 initial_axes_angles=scan[3],
+                                                 diff_angles=data[3], mode='shade',
+                                                 directions_axes=self.axes_directions,
+                                                 rotation_axes=self.axes_rotations, data=data)
 
             if hasattr(self, 'obstacles') and self.obstacles != list():
                 for obstacle in self.obstacles:
@@ -266,7 +265,7 @@ class Experiment:
             delattr(self, 'known_hkl_orig')
         return True, None
 
-    def _apply_detector(self,data, dist, orientation, rot, disp_y, disp_z ):
+    def _apply_detector(self, data, dist, orientation, rot, disp_y, disp_z):
         if self.det_geometry is not None:
             detector = Ray_obstacle(dist=dist, geometry=self.det_geometry, height=self.det_height, rot=rot,
                                     orientation=orientation, width=self.det_width, diameter=self.det_diameter,
@@ -664,7 +663,6 @@ class Experiment:
         angles_dict = dict(zip(self.axes_names, initial_angles))
         for angles_, name in zip(angles, names):
             angles_dict[name] = angles_
-        print(angles_dict)
         additional_operations = {'abs': abs}
         variables_dict = {**detector_dict, **angles_dict, **additional_operations}
         collisions = [i for i in self.logic_collision if i.get('static_angle', False)]
@@ -814,7 +812,6 @@ class Experiment:
                                            all_hkl_orig=self.hkl_origin_in_d_range, visualise=visualise,
                                            trash_unknown=False,
                                            cryst_coord=False, b_matr=self.cell.b_matrix, )
-        print(data[0][0].shape)
         self.known_hkl = fig
         return fig
 
@@ -827,27 +824,30 @@ class Experiment:
         return fig
 
     def json_export(self, object_):
-        objects = ['obstacles', 'detector', 'goniometer', 'wavelength', 'instrument', 'runs']
+        objects = [ 'obstacles', 'linked_obstacles', 'detector', 'goniometer', 'wavelength', 'instrument', 'runs', ]
         assert object_ in objects, f'object of export may be: {(", ").join(objects)}'
-        if object_ == 'obstacles':
-            data_ = sf.generate_dicts_for_obst(exp_inst=self)
-        elif object_ == 'detector':
-            data_ = sf.generate_det_dict(exp_inst=self)
-        elif object_ == 'wavelength':
-            data_ = {'wavelength': self.wavelength}
-        elif object_ == 'goniometer':
-            data_ = sf.generate_dicts_for_goniometer(exp_inst=self)
-        elif object_ == 'instrument':
-            data_ = {
-                'wavelength': {'wavelength': self.wavelength},
-                'goniometer': sf.generate_dicts_for_goniometer(exp_inst=self),
-                'detector': sf.generate_det_dict(exp_inst=self),
-                'obstacles': sf.generate_dicts_for_obst(exp_inst=self)
-            }
-        elif object_ == 'runs':
-            data_ = sf.generate_scans_dicts_list(exp_inst=self)
+        match object_:
+            case 'obstacles':
+                data_ = sf.generate_dicts_for_obst(exp_inst=self)
+            case 'linked_obstacles':
+                data_ = sf.generate_dicts_for_linked_obst(exp_inst=self)
+            case 'detector':
+                data_ = sf.generate_det_dict(exp_inst=self)
+            case 'wavelength':
+                data_ = {'wavelength': self.wavelength}
+            case 'goniometer':
+                data_ = sf.generate_dicts_for_goniometer(exp_inst=self)
+            case 'instrument':
+                data_ = {
+                    'wavelength': {'wavelength': self.wavelength},
+                    'goniometer': sf.generate_dicts_for_goniometer(exp_inst=self),
+                    'detector': sf.generate_det_dict(exp_inst=self),
+                    'obstacles': sf.generate_dicts_for_obst(exp_inst=self),
+                    'linked_obstacles': sf.generate_dicts_for_linked_obst(exp_inst=self)
+                }
+            case 'runs':
+                data_ = sf.generate_scans_dicts_list(exp_inst=self)
         data_json = json.dumps(data_, ensure_ascii=False, indent=4)
-
         return data_json
 
     @mylogger(log_args=True)
@@ -855,7 +855,10 @@ class Experiment:
         objects = ['obstacles', 'detector', 'goniometer', 'wavelength']
         assert object_ in objects, f'object of export may be: {(", ").join(objects)}'
         if object_ == 'obstacles':
+            self.clear_obstacles()
             return self._load_obstacles(data_, extra)
+        if object_ == 'linked_obstacles':
+            pass
         if object_ == 'wavelength':
             return self._load_wavelength(data_)
         if object_ == 'detector':
@@ -1069,6 +1072,12 @@ class Experiment:
         for sdc in self.strategy_data_container.scan_data_containers:
             self.cdcc.add_data(sdc)
 
+    def clear_obstacles(self):
+        self.obstacles = []
+
+    def clear_linked_obstacles(self):
+        self.linked_obstacles = []
+
 
 import services.service_functions as sf
 
@@ -1102,8 +1111,9 @@ if __name__ == '__main__':
     # anvil_normal = np.array([1., 0., 0.])
     # exp2.add_linked_obstacle(highest_linked_axis_index=0,width=100,height=100,distance=40,geometry='circle',orientation='independent',rot=(0,0,0),
     #                          displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
-    exp2.add_linked_obstacle(highest_linked_axis_index=0,width=100,height=100,distance=40,geometry='circle',orientation='normal',rot=(0,0,0),
-                             displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
+    exp2.add_linked_obstacle(linked_axis=0, width=100, height=100, distance=40, geometry='circle', orientation='normal',
+                             rot=(0, 0, 0),
+                             displacement_y=0, displacement_z=0, name='chupacabra', diameter=100)
     exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
                         axes_names=['a', 'b', 'omega'])
     for angle, sweep in zip(angles, sweeps):
