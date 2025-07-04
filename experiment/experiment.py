@@ -144,6 +144,7 @@ class Experiment:
     def add_linked_obstacle(self, linked_axis, distance, geometry, orientation, rot, displacement_y=None,
                             displacement_z=None, height=None,
                             width=None, diameter=None, name='', ):
+        print(name)
         lo = LinkedObstacle(dist=distance, geometry=geometry, orientation=orientation, rot=rot,
                             disp_y=displacement_y, disp_z=displacement_z, height=height, width=width, name=name,
                             diameter=diameter, highest_linked_axis_index=linked_axis)
@@ -852,13 +853,14 @@ class Experiment:
 
     @mylogger(log_args=True)
     def load_instrument_unit(self, data_, object_, extra=None):
-        objects = ['obstacles', 'detector', 'goniometer', 'wavelength']
+        objects = ['obstacles', 'detector', 'goniometer', 'wavelength', 'linked_obstacles']
         assert object_ in objects, f'object of export may be: {(", ").join(objects)}'
         if object_ == 'obstacles':
             self.clear_obstacles()
             return self._load_obstacles(data_, extra)
         if object_ == 'linked_obstacles':
-            pass
+            self.clear_linked_obstacles()
+            return self._load_linked_obstacles(data_, extra)
         if object_ == 'wavelength':
             return self._load_wavelength(data_)
         if object_ == 'detector':
@@ -887,6 +889,24 @@ class Experiment:
                 obst.pop('rotation_y')
                 obst.pop('rotation_z')
                 self.add_obstacles(**obst, rot=rot)
+                table_data.append(table)
+        else:
+            return False
+        return table_data, table_num
+
+    def _load_linked_obstacles(self, data_, table_num):
+        dicts_check = all([sf.check_obstacle_dict(obst,linked=True) for obst in data_])
+        axes_dict = {key: val for key, val in enumerate(self.axes_names)}
+        if dicts_check:
+            table_data = []
+            for obst in data_:
+                table = apg.generate_obst_table(n_cl=table_num, data=obst,linked=True,axes_dict=axes_dict)
+                table_num += 1
+                rot = (obst['rotation_x'], obst['rotation_y'], obst['rotation_z'])
+                obst.pop('rotation_x')
+                obst.pop('rotation_y')
+                obst.pop('rotation_z')
+                self.add_linked_obstacle(**obst, rot=rot)
                 table_data.append(table)
         else:
             return False

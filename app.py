@@ -3362,5 +3362,29 @@ def download_linked_obstacles(n_clicks):
     data_json = exp1.json_export('linked_obstacles')
     return dict(content=data_json, filename='linked_obstacles_input.json')
 
+@callback(
+    Output('upload_linked_obstacles', 'contents'),
+    Output('linked_obstacle_div', 'children', allow_duplicate=True),
+    Output('stored_obstacle_num', 'data', allow_duplicate=True),
+    Output('stored_linked_obstacles_div', 'data', allow_duplicate=True),
+    Output('hidden_div_2', 'children', allow_duplicate=True),
+    Input('upload_linked_obstacles', 'contents'),
+    State('stored_obstacle_num', 'data'),
+    prevent_initial_call=True
+)
+@mylogger(level='DEBUG', log_args=True)
+def load_obstacles(json_f, table_num):
+    if not json_f:
+        raise dash.exceptions.PreventUpdate()
+    try:
+        json_data = sf.process_dcc_upload_json(json_f)
+    except JSONDecodeError:
+        return None, no_upd, no_upd, no_upd, (True, read_json_error.header, read_json_error.body)
+    data = exp1.load_instrument_unit(json_data, 'linked_obstacles', table_num)
+    if not data:
+        return None, no_upd, no_upd, no_upd, (True, load_obstacles_error.header, load_obstacles_error.body)
+    else:
+        return None, data[0], data[1], data[0], no_upd
+
 if __name__ == '__main__':
     app.run(debug=True, )

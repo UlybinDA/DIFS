@@ -24,7 +24,7 @@ class LinkedObstacle(Ray_obstacle):
                  name: str = ''
                  ):
         super().__init__(dist=dist, geometry=geometry, disp_y=disp_y, disp_z=disp_z, rot=rot, orientation=orientation,
-                         height=height, width=width, diameter=diameter, complex=False)
+                         height=height, width=width, diameter=diameter, complex=False,name=name)
         self.highest_linked_axis_index = highest_linked_axis_index
 
     def _zero_angle_rotation(self):
