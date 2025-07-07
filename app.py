@@ -2077,6 +2077,11 @@ def download_instrument(n_clicks):
 
     Output('obstacle_div', 'children', allow_duplicate=True),
     Output('stored_obstacles_div', 'data', allow_duplicate=True),
+
+
+    Output('linked_obstacle_div', 'children', allow_duplicate=True),
+    Output('stored_linked_obstacles_div', 'data', allow_duplicate=True),
+
     Output('stored_obstacle_num', 'data', allow_duplicate=True),
 
     Output('upload_instrument', 'contents', allow_duplicate=True),
@@ -2091,8 +2096,8 @@ def load_instrument(json_f, table_num):
     try:
         json_data = sf.process_dcc_upload_json(json_f)
     except JSONDecodeError:
-        return (True, read_json_error.header, read_json_error.body), *([no_upd] * 14), None
-    instrument_data = exp1.load_instrument(data_=json_data, extra=table_num)
+        return (True, read_json_error.header, read_json_error.body), *([no_upd] * 16), None
+    instrument_data = exp1.load_instrument(data_=json_data, table_num=table_num)
     results = []
 
     flags_loaded = sf.get_loaded_flags(instrument_data)
@@ -2111,7 +2116,7 @@ def load_instrument(json_f, table_num):
     else:
         results.append(no_upd)
 
-    if instrument_data['detector']:
+    if instrument_data.get('detector',None):
         if instrument_data['detector'][1] == 'Circle':
             results.extend([*[instrument_data['detector'][0]] * 2, *[no_upd] * 2, *['Circle'] * 2])
         else:
@@ -2119,22 +2124,35 @@ def load_instrument(json_f, table_num):
     else:
         results.extend([no_upd] * 6)
 
-    if instrument_data['wavelength']:
+    if instrument_data.get('wavelength',None):
         results.extend([*[instrument_data['wavelength']] * 2])
     else:
         results.extend([no_upd] * 2)
 
-    if instrument_data['goniometer']:
+    if instrument_data.get('goniometer',None):
         content_vars.real_axes = instrument_data['goniometer'][1]
         content_vars.axes_angles = instrument_data['goniometer'][2]
         results.extend([None, *[instrument_data['goniometer'][0]] * 2])
     else:
         results.extend([no_upd] * 3)
 
-    if instrument_data['obstacles']:
-        results.extend([*[instrument_data['obstacles'][0]] * 2, instrument_data['obstacles'][1]])
+    if instrument_data.get('obstacles',None):
+        results.extend([*[instrument_data['obstacles'][0]] * 2])
     else:
-        results.extend([no_upd] * 3)
+        results.extend([no_upd] * 2)
+
+    if instrument_data.get('linked_obstacles',None):
+        results.extend([*[instrument_data['linked_obstacles'][0]] * 2])
+    else:
+        results.extend([no_upd] * 2)
+
+    if instrument_data.get('table_num', None):
+        results.extend([instrument_data['table_num']])
+    else:
+        results.extend([no_upd])
+
+
+
 
     return *results, None
 

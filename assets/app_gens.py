@@ -130,6 +130,10 @@ def generate_obst_table(n_cl, data=None, linked=False, axes_dict=None):
 
         }
     if not data:
+        hidden_columns = [f'obst_prm_{n_cl}_displacement_y',
+                          f'obst_prm_{n_cl}_displacement_z',
+                          f'obst_prm_{n_cl}_diameter',
+                          ]
         if linked:
             data_ = pd.DataFrame({f'obst_prm_{n_cl}_distance': 10,
                                   f'obst_prm_{n_cl}_geometry': 'rectangle',
@@ -214,10 +218,7 @@ def generate_obst_table(n_cl, data=None, linked=False, axes_dict=None):
                                        data=data_,
                                        columns=columns,
                                        dropdown=dropdown,
-                                       hidden_columns=[f'obst_prm_{n_cl}_displacement_y',
-                                                       f'obst_prm_{n_cl}_displacement_z',
-                                                       f'obst_prm_{n_cl}_diameter',
-                                                       ],
+                                       hidden_columns=hidden_columns,
                                        )],
                  style={'display': 'inline-block'}
                  ),

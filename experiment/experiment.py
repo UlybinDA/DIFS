@@ -852,15 +852,15 @@ class Experiment:
         return data_json
 
     @mylogger(log_args=True)
-    def load_instrument_unit(self, data_, object_, extra=None):
+    def load_instrument_unit(self, data_, object_, table_num=None):
         objects = ['obstacles', 'detector', 'goniometer', 'wavelength', 'linked_obstacles']
         assert object_ in objects, f'object of export may be: {(", ").join(objects)}'
         if object_ == 'obstacles':
             self.clear_obstacles()
-            return self._load_obstacles(data_, extra)
+            return self._load_obstacles(data_, table_num)
         if object_ == 'linked_obstacles':
             self.clear_linked_obstacles()
-            return self._load_linked_obstacles(data_, extra)
+            return self._load_linked_obstacles(data_, table_num)
         if object_ == 'wavelength':
             return self._load_wavelength(data_)
         if object_ == 'detector':
@@ -963,11 +963,12 @@ class Experiment:
             return False
 
     @mylogger(log_args=True)
-    def load_instrument(self, data_, extra=None):
+    def load_instrument(self, data_, table_num=None):
         wavelength = data_.get('wavelength', None)
         goniometer = data_.get('goniometer', None)
         detector = data_.get('detector', None)
         obstacles = data_.get('obstacles', None)
+        linked_obstacles = data_.get('linked_obstacles', None)
         data_output = {}
         if wavelength:
             if wavelength['wavelength']:
@@ -995,12 +996,21 @@ class Experiment:
             data_output['detector'] = None
         if obstacles:
             if obstacles[0]['distance']:
-                data_obstacles = self.load_instrument_unit(obstacles, 'obstacles', extra=extra)
+                data_obstacles = self.load_instrument_unit(obstacles, 'obstacles', table_num=table_num)
+                table_num = data_obstacles[1]
                 data_output['obstacles'] = data_obstacles
             else:
                 data_output['obstacles'] = None
         else:
             data_output['obstacles'] = None
+        if linked_obstacles:
+            if linked_obstacles[0]['distance']:
+                data_linked_obstacles = self.load_instrument_unit(linked_obstacles,'linked_obstacles',table_num=table_num)
+                data_output['linked_obstacles'] = data_linked_obstacles
+                table_num += data_linked_obstacles[1]
+            else:
+                data_output['linked_obstacles'] = None
+        data_output['table_num'] = table_num
         return data_output
 
     def check_collision_v2(self, scans=None, type_='highest'):
