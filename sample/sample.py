@@ -3,11 +3,12 @@ from scipy.spatial.transform import Rotation as R
 from typing import Tuple, Union, Optional, List, Dict, Any
 from symmetry.pointsymmetry import generate_hkl_by_pg, PG_KEYS, get_key, generate_orig_hkl_array
 from services.rotation_wrapper import apply_rotation_vecs
+from services.lorentz_wrapper import calc_lorentz
 from logger.my_logger import mylogger
 import warnings
 from services.angle_calc import ang_bw_two_vects
-warnings.filterwarnings("ignore", category=RuntimeWarning)
 
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 class Sample():
@@ -378,7 +379,8 @@ class Sample():
              hkl_array: Optional[np.ndarray] = None,
              hkl_array_orig: Optional[np.ndarray] = None,
              wavelength: float = 0.71073,
-             only_angles: bool = False) -> Union[Tuple[np.ndarray, np.ndarray],
+             only_angles: bool = False,
+             lorentz_minimum: Optional[float] = 0.0) -> Union[Tuple[np.ndarray, np.ndarray],
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         if hkl_array is None:
             raise Exception('hkl_array is None, please provide some reflections as numpy array object (-1,3)')
@@ -439,7 +441,50 @@ class Sample():
         hkl_array_orig_all = np.vstack((hkl_array_orig1, hkl_array_orig2))
         diff_vec_all = np.vstack((diff_vec1, diff_vec2))
         diff_vec_all = diff_vec_all / np.linalg.norm(diff_vec_all, axis=1).reshape(-1, 1)
+        if lorentz_minimum and lorentz_minimum != 0.0:
+            diff_vec_all, hkl_all, hkl_array_orig_all, angles_all = self._apply_lorentz_filter(
+                diff_vec_all,
+                hkl_all,
+                hkl_array_orig_all,
+                angles_all,
+                rotations,
+                angles,
+                directions,
+                no_of_scan,
+                lorentz_minimum
+            )
         return (diff_vec_all, hkl_all, hkl_array_orig_all, angles_all)
+
+    def _apply_lorentz_filter(
+            self,
+            diff_vec_all: np.ndarray,
+            hkl_all: np.ndarray,
+            hkl_array_orig_all: np.ndarray,
+            angles_all: np.ndarray,
+            rotations: str,
+            angles: Tuple[float, float, float],
+            directions: Tuple[int, int, int],
+            no_of_scan: int,
+            lorentz_minimum: float
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Применяет фильтрацию по коэффициенту Лоренца."""
+        primary_beam = np.array([1., 0., 0.])
+        rotation_axis = self.calc_scan_vect(
+            rotations=rotations,
+            angles=angles,
+            directions=directions,
+            n_of_scan=no_of_scan
+        )
+        rec_vectors = np.matmul(self.orient_matx, hkl_all.reshape(-1, 3, 1)).reshape(-1, 3)
+        lor_coeff = calc_lorentz(rotation_axis, diff_vec_all, rec_vectors, primary_beam)
+        mask = lor_coeff > lorentz_minimum
+
+        return (
+            diff_vec_all[mask, :],
+            hkl_all[mask, :],
+            hkl_array_orig_all[mask, :],
+            angles_all[mask, :]
+        )
 
     def calc_scan_vect(self,
                        rotations: str,

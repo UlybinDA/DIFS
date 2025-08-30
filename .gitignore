@@ -1,2 +1,6 @@
 venv
 app.log
+setup/*.cpp
+setup/*.c
+setup/*.pyd
+setup/build
