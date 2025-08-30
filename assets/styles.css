@@ -1,0 +1,9 @@
+.white-space-pre {
+  white-space: pre-wrap;
+  tab-size: 4;
+  font-family: monospace;
+}
+
+.show-hide {
+    display: none;
+}
