@@ -1,0 +1,134 @@
+[
+  {
+    "name": "detector distance out of range",
+    "problem": "detector distance should be between 35 and 205 mm",
+    "level": 1,
+    "parameter": "d_dst",
+    "pre_condition": null,
+    "condition": [
+      [
+        "d_dist>=35",
+        "d_dist<=205"
+      ]
+    ]
+  },
+  {
+    "name": "non-scanning axis: chi",
+    "problem": "chi axis cannot be scanning",
+    "level": 2,
+    "parameter": "scan_ax",
+    "pre_condition": null,
+    "condition": [
+      [
+        "scan_ax!='chi'"
+      ]
+    ]
+  },
+  {
+    "name": "Detector wrong thetha position",
+    "problem": "Detector collided with Mo source",
+    "level": 1,
+    "parameter": "det_ang_z",
+    "pre_condition": [
+      "d_dist<=90"
+    ],
+    "condition": [
+      [
+        "det_ang_z>=0.0009*d_dist**2 - 0.4125*d_dist - 89.49 + 1 + 40.083"
+      ]
+    ]
+  },
+    {
+    "name": "Detector wrong thetha position",
+    "problem": "Detector collided with Mo source",
+    "level": 1,
+    "parameter": "det_ang_z",
+    "pre_condition": [
+      "d_dist>=130"
+    ],
+    "condition": [
+      [
+        "det_ang_z>=-120.1"
+      ]
+    ]
+  },
+    {
+    "name": "Detector wrong thetha position",
+    "problem": "Detector collided with Cu source",
+    "level": 1,
+    "parameter": "det_ang_z",
+    "pre_condition": [
+      "d_dist<=130",
+      "d_dist>=90"
+    ],
+    "condition": [
+      [
+        "det_ang_z <=-0.0014*d_dist**2 + 0.5808*d_dist + 46.476 + 2 + 40.083"
+      ]
+    ]
+  },
+    {
+    "name": "Detector wrong thetha position",
+    "problem": "Detector collided with Cu source",
+    "level": 1,
+    "parameter": "det_ang_z",
+    "pre_condition": [
+      "d_dist>=130"
+    ],
+    "condition": [
+      [
+        "det_ang_z<=100.1"
+      ]
+    ]
+  },
+
+
+
+  {
+    "name": "omega sweep exceeded",
+    "problem": "omega sweep cannot be greater than... well check condition formula, I guess... ",
+    "level": 3,
+    "parameter": "omega",
+    "pre_condition": [
+      "scan_ax=='omega'",
+      "d_dist<=180"
+    ],
+    "condition": [
+      [
+        "sweep<=360-2*(-0.00000000027569*d_dist**6 + 0.00000016004*d_dist**5 - 0.000036938*d_dist**4 + 0.0042959*d_dist**3 - 0.25834*d_dist**2 + 6.6059*d_dist**1 + 49.878+2)"
+      ]
+    ]
+  },
+  {
+    "name": "omega position out of range",
+    "problem": "omega position out of range...",
+    "level": 2,
+    "parameter": "omega",
+    "pre_condition": [
+      "d_dist<=180"
+    ],
+    "condition": [
+      [
+        "omega>=-270 + (-0.00000000027569*d_dist**6 + 0.00000016004*d_dist**5 - 0.000036938*d_dist**4 + 0.0042959*d_dist**3 - 0.25834*d_dist**2 + 6.6059*d_dist**1 + 49.878+2) + det_ang_z",
+        "omega<=90 + (-0.00000000027569*d_dist**6 + 0.00000016004*d_dist**5 - 0.000036938*d_dist**4 + 0.0042959*d_dist**3 - 0.25834*d_dist**2 + 6.6059*d_dist**1 + 49.878+2) + det_ang_z"
+      ]
+    ],
+    "static_angle": true
+  },
+  {
+    "name": "omega final position out of range",
+    "problem": "omega final position out of range...",
+    "level": 3,
+    "parameter": "omega",
+    "pre_condition": [
+      "scan_ax=='omega'",
+      "d_dist<=180"
+    ],
+    "condition": [
+      [
+        "omega+sweep>=-270 + (-0.00000000027569*d_dist**6 + 0.00000016004*d_dist**5 - 0.000036938*d_dist**4 + 0.0042959*d_dist**3 - 0.25834*d_dist**2 + 6.6059*d_dist**1 + 49.878+2) + det_ang_z",
+        "omega+sweep<=90 + (-0.00000000027569*d_dist**6 + 0.00000016004*d_dist**5 - 0.000036938*d_dist**4 + 0.0042959*d_dist**3 - 0.25834*d_dist**2 + 6.6059*d_dist**1 + 49.878+2) + det_ang_z"
+      ]
+    ]
+  }
+]

@@ -1,0 +1,15 @@
+d_dist>=50;
+abs(kappa)<=60;
+scan_ax!="kappa";
+kappa!=0,scan_ax=="omega",sweep<=150
+kappa==0,scan_ax=="omega",sweep<=150
+scan_ax=="phi";
+kappa==0,omega>-90+det_ang_z,omega<90+det_ang_z
+kappa>0,omega>-30+det_ang_z,omega<120+det_ang_z
+kappa<0,omega>-120+det_ang_z,omega<30+det_ang_z;
+scan_ax=="omega",omega+sweep<=90+det_ang_z
+scan_ax=="omega",omega+sweep<=120+det_ang_z
+scan_ax=="omega",omega+sweep<=30+det_ang_z
+scan_ax=="phi",kappa==0
+scan_ax=="phi",kappa>0
+scan_ax=="phi",kappa<0;

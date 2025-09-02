@@ -76,9 +76,9 @@ def generate_original_hkl_for_hkl_array(hkl_array: np.ndarray, pg: str, paramete
     hkl_array_, hkl_array_orig = sample.gen_hkl_arrays(type='d_range', d_range=d_range, return_origin=True, pg=pg,
                                                        centring=centring)
     generated_hkl_encoded_array = encode_hkl(hkl_array_)
-    hkl_encoded_array = encode_hkl(hkl_array)
-    sort_idx = np.argsort(generated_hkl_encoded_array)
-    sorted_hkl = generated_hkl_encoded_array[sort_idx]
+    hkl_encoded_array = encode_hkl(hkl_array).reshape(-1)
+    sort_idx = np.argsort(generated_hkl_encoded_array,0)
+    sorted_hkl = generated_hkl_encoded_array[sort_idx].reshape(-1)
     sorted_hkl_o = hkl_array_orig[sort_idx.reshape(-1, 1)[:, 0]]
     indices = np.searchsorted(sorted_hkl, hkl_encoded_array).reshape(-1, 1)
     hkl_orig = sorted_hkl_o[indices[:, 0]]

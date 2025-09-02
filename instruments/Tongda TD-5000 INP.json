@@ -1,0 +1,78 @@
+{
+    "wavelength": {
+        "wavelength": 0.71073
+    },
+    "goniometer": [
+        {
+            "axes_names": "phi",
+            "axes_directions": "+",
+            "axes_rotations": "z",
+            "axes_angles": 0.0,
+            "axes_real": "true"
+        },
+        {
+            "axes_names": "al_n",
+            "axes_directions": "-",
+            "axes_rotations": "y",
+            "axes_angles": 54.8,
+            "axes_real": "false"
+        },
+        {
+            "axes_names": "kappa",
+            "axes_directions": "+",
+            "axes_rotations": "z",
+            "axes_angles": 0.0,
+            "axes_real": "true"
+        },
+        {
+            "axes_names": "al_p",
+            "axes_directions": "+",
+            "axes_rotations": "y",
+            "axes_angles": 54.8,
+            "axes_real": "false"
+        },
+        {
+            "axes_names": "omega",
+            "axes_directions": "+",
+            "axes_rotations": "z",
+            "axes_angles": 0.0,
+            "axes_real": "true"
+        }
+    ],
+    "detector": {
+        "det_geometry": "rectangle",
+        "det_complex": false,
+        "det_height": 179.0,
+        "det_width": 169.0
+    },
+    "obstacles": [
+        {
+            "distance": 10,
+            "geometry": "circle",
+            "orientation": "normal",
+            "displacement_y": 0,
+            "displacement_z": 0,
+            "height": null,
+            "width": null,
+            "diameter": 1,
+            "rotation_x": 0,
+            "rotation_y": 0,
+            "rotation_z": 0,
+            "name": "bs"
+        },
+	        {
+            "distance": 10,
+            "geometry": "rectangle",
+            "orientation": "independent",
+            "displacement_y": 0,
+            "displacement_z": 250,
+            "height": 500,
+            "width": 1,
+            "diameter": 1,
+            "rotation_x": 0,
+            "rotation_y": 0,
+            "rotation_z": 0,
+            "name": "bs_holder"
+        }
+    ]
+}
