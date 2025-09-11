@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 
-class Ray_obstacle():
+class Ray_obstacle:
     @mylogger('DEBUG', log_args=True)
     def __init__(self,
                  dist: float,
@@ -519,6 +519,7 @@ class Ray_obstacle():
                 data_output = self._slice_data(data, check, mode)
                 return data_output
             return None
+
 
     def sift(self,
              data: Tuple[np.ndarray, ...],

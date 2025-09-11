@@ -24,75 +24,101 @@ class LinkedObstacle(Ray_obstacle):
                  name: str = ''
                  ):
         super().__init__(dist=dist, geometry=geometry, disp_y=disp_y, disp_z=disp_z, rot=rot, orientation=orientation,
-                         height=height, width=width, diameter=diameter, complex=False,name=name)
+                         height=height, width=width, diameter=diameter, complex=False, name=name)
         self.highest_linked_axis_index = highest_linked_axis_index
 
     def _zero_angle_rotation(self):
         init_rotation = R.from_euler('xyz', angles=self.rot, degrees=True)
-        vecs = self._prepare_obstacle_vecs(orientation=self.orientation, geometry=self.geometry,
+        obst_vecs = self._prepare_obstacle_vecs(orientation=self.orientation, geometry=self.geometry,
                                            height=self.height, rotation=init_rotation, width=self.width,
                                            diameter=self.diameter,
                                            vec_origin_to_centre=self.vec_origin_to_centre, disp_y=self.disp_y,
                                            disp_z=self.disp_z)
-        return vecs
+        return obst_vecs
 
-    def _static_angle_filter(self, vecs, axes_linked_to_obst, data, diff_vecs, mode, angles, directions):
-        angles *= directions
-        linked_rotation = R.from_euler(axes_linked_to_obst, angles=angles, degrees=True)
-        vecs = linked_rotation.apply(vecs)
-        data = self.filter(diff_vecs=diff_vecs, data=data, mode=mode, vecs=vecs)
+    @staticmethod
+    def scipy_rot(vectors,axes,angles,degrees=True):
+        assert len(angles) == len(axes), 'rotation input error'
+        for ang, axis in zip(angles, axes):
+            r = R.from_euler(axis, ang, degrees=True)
+            vectors = r.apply(vectors)
+        return vectors
+
+    def primary_beam_passes_by(self,beam_vector, obstacle_vectors):
+        _ = self.filter(diff_vecs=-beam_vector,data=(-beam_vector,),mode='shade',vecs=obstacle_vectors)
+        if len(_[0]) == 0:
+            return False
+        return True
+
+    def _static_angle_filter(self, obst_vecs, axes_linked_to_obst, data, diff_vecs, mode, angles, directions,primary_beam):
+        angles = np.array(directions) * np.array(angles)
+        obst_vecs = self.scipy_rot(obst_vecs, axes_linked_to_obst, angles)
+        beam_pass_by = self.primary_beam_passes_by(primary_beam, obst_vecs)
+        if beam_pass_by:
+            data = self.filter(diff_vecs=diff_vecs, data=data, mode=mode, vecs=obst_vecs)
+        else:
+            data = tuple([] for _ in range(len(data)))
         return data
 
     def filter_linked_obstacle(self, scan_axis_index, diff_vectors, initial_axes_angles, diff_angles, directions_axes,
-                               data, rotation_axes,
-                               mode):
-        mode = 'false' if mode == 'shade' else 'true' if mode == 'transmit' else 'both' if mode == 'separate' else None
+                               data, rotation_axes, mode, primary_beam=np.array([[1.,0.,0.]])):
+        mode = 'true' if mode == 'shade' else 'false' if mode == 'transmit' else 'both' if mode == 'separate' else None
         static_filter = True if self.highest_linked_axis_index > scan_axis_index else False
         axes_linked_to_obst = rotation_axes[self.highest_linked_axis_index:]
         angles = initial_axes_angles[self.highest_linked_axis_index:]
         directions_axes = directions_axes[self.highest_linked_axis_index:]
-        vecs = self._zero_angle_rotation()
+        obst_vecs = self._zero_angle_rotation()
         if static_filter:
-            return self._static_angle_filter(vecs, axes_linked_to_obst, data, diff_vectors, mode, angles,
-                                             directions_axes)
+            return self._static_angle_filter(obst_vecs, axes_linked_to_obst, data, diff_vectors, mode, angles,
+                                             directions_axes,primary_beam)
         else:
             return self._dynamic_angle_filter(scan_axis_index, axes_linked_to_obst, directions_axes, angles,
-                                              rotation_axes, vecs, diff_angles,
-                                              diff_vectors, data, mode)
+                                              rotation_axes, obst_vecs, diff_angles,
+                                              diff_vectors, data, mode,primary_beam)
 
-    def _dynamic_angle_filter(self, scan_axis_index, axes_linked_to_obst, directions, angles, axes, vecs, diff_angles,
-                              diff_vectors, data, mode):
+    def _dynamic_angle_filter(self, scan_axis_index, axes_linked_to_obst, directions, angles, axes, obst_vecs, diff_angles,
+                              diff_vectors, data, mode,primary_beam):
         slice_shift_scan_axis = scan_axis_index - self.highest_linked_axis_index
         matr1, matr3 = Sample.generate_rotation_matrices(axes_linked_to_obst, directions, angles,
                                                          slice_shift_scan_axis)
         rotation_axis = axes[slice_shift_scan_axis]
         direction = directions[slice_shift_scan_axis]
-        vecs_rotated = []
-
+        obst_vecs_rotated = []
         if self.geometry == 'rectangle':
-            if ang_bw_two_vects(np.cross(vecs[0], vecs[1]), vecs[2]) > np.pi / 2:
-                vecs = vecs[::-1]
+            if ang_bw_two_vects(np.cross(obst_vecs[0], obst_vecs[1]), obst_vecs[2]) < np.pi / 2:
+                obst_vecs = obst_vecs[::-1]
 
         if self.geometry == 'circle' and self.orientation == 'independent':
-            vecs = np.vstack((vecs[1:, :], self.vec_origin_to_centre))
+            obst_vecs = np.vstack((obst_vecs[1:, :], self.vec_origin_to_centre))
 
-        for vec in vecs:
-            vecs_rotated.append(apply_rotation_vec(vector=vec, angles=diff_angles, matr1=matr1, matr3=matr3,
+        for vec in obst_vecs:
+            obst_vecs_rotated.append(apply_rotation_vec(vector=vec, angles=diff_angles, matr1=matr1, matr3=matr3,
                                                    axis=rotation_axis, direction=direction))
 
-        vecs = np.array(vecs_rotated)
+        obst_vecs = np.array(obst_vecs_rotated)
+        primary_beam_array = np.tile(-primary_beam, diff_vectors.shape)
         if self.geometry == 'rectangle':
-            check = check_rectangle_intersection(diff_vectors=diff_vectors, rectangle_vertices=vecs).reshape(-1, 1)
+            check_diff = check_rectangle_intersection(diff_vectors=diff_vectors, rectangle_vertices=obst_vecs).reshape(-1, 1)
+            check_primary = check_rectangle_intersection(diff_vectors=primary_beam_array, rectangle_vertices=obst_vecs).reshape(-1, 1)
         else:
             if self.orientation == 'normal':
-                max_ang_cos = ang_bw_two_vects(vec1=vecs[0, 0], vec2=vecs[1, 0], result='cos')
-                check = check_circle_angle(diff_vectors=diff_vectors, circle_normals=vecs[0],
+                max_ang_cos = ang_bw_two_vects(vec1=obst_vecs[0, 0], vec2=obst_vecs[1, 0], result='cos')
+                check_diff = check_circle_angle(diff_vectors=diff_vectors, circle_normals=obst_vecs[0],
+                                           max_ang_cos=max_ang_cos).reshape(-1, 1)
+                check_primary = check_circle_angle(diff_vectors=primary_beam_array, circle_normals=obst_vecs[0],
                                            max_ang_cos=max_ang_cos).reshape(-1, 1)
             else:
-                check = check_circle_intersection(diff_vectors=diff_vectors,
-                                                  circle_normals=vecs[0],
-                                                  origin_to_center=vecs[1],
+                check_diff = check_circle_intersection(diff_vectors=diff_vectors,
+                                                  circle_normals=obst_vecs[0],
+                                                  origin_to_center=obst_vecs[1],
                                                   diameter=self.diameter).reshape(-1, 1)
+
+                check_primary = check_circle_intersection(diff_vectors=diff_vectors,
+                                                  circle_normals=obst_vecs[0],
+                                                  origin_to_center=obst_vecs[1],
+                                                  diameter=self.diameter).reshape(-1, 1)
+
+        check = check_diff & check_primary
         data_output = self._slice_data(data, check, mode)
         return data_output
 
