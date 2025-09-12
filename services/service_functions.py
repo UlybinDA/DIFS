@@ -17,9 +17,9 @@ from assets.modals_content import *
 from services.encode_hkl import encode_hkl
 from typing import Tuple, List, Dict, Union, Optional, Any
 import re
+from collections import defaultdict
 from obstacles.obstacle import Ray_obstacle
 from obstacles.linked_obstacle import LinkedObstacle
-
 
 def load_hklf4(hkl_str: str, trash_zero: bool = True) -> np.ndarray:
     try:
@@ -1424,19 +1424,19 @@ def generate_dicts_for_obst(exp_inst: Any) -> List[Dict[str, Any]]:
 def generate_dicts_for_linked_obst(exp_inst: Any) -> List[Dict[str, Any]]:
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
-    dummy = [[*[None, ] * 9, [None, None, None], None], ]
-    obstacle_list = exp_inst.linked_obstacles if exp_inst.linked_obstacles else dummy
     obstacle_parameters = ['distance', 'geometry', 'orientation', 'displacement_y', 'displacement_z', 'height', 'width',
-                           'diameter','linked_axis', 'rotation_x', 'rotation_y', 'rotation_z', 'name']
-    obst_dicts = []
-    for obst in obstacle_list:
-        assert isinstance(obst, LinkedObstacle)
-        obst = [obst.dist,obst.geometry,obst.orientation,obst.disp_y,obst.disp_z, obst.height,obst.width, obst.diameter,
-                obst.highest_linked_axis_index,*obst.rot,obst.name]
-        obstacle_dict = dict(zip(obstacle_parameters, obst))
-        obst_dicts.append(obstacle_dict)
-    return obst_dicts
-
+                           'diameter', 'linked_axis', 'rotation_x', 'rotation_y', 'rotation_z', 'name']
+    if exp_inst.linked_obstacles:
+        obstacle_list = exp_inst.linked_obstacles
+        obst_dicts = []
+        for obst in obstacle_list:
+            obst = [obst.dist,obst.geometry,obst.orientation,obst.disp_y,obst.disp_z, obst.height,obst.width, obst.diameter,
+                    obst.highest_linked_axis_index,*obst.rot,obst.name]
+            obstacle_dict = dict(zip(obstacle_parameters, obst))
+            obst_dicts.append(obstacle_dict)
+        return obst_dicts
+    else:
+        return [dict(zip(obstacle_parameters,[*[None]*len(obstacle_parameters)]))]
 
 def check_goniometer_dict(dict_: Dict[str, Any]) -> bool:
     if not dict_has_keys(dict_, ['axes_names', 'axes_directions', 'axes_rotations', 'axes_angles', 'axes_real']):
