@@ -5,7 +5,7 @@ import warnings
 from logger.my_logger import mylogger
 from typing import Tuple, Union, Optional, List, Dict, Any
 from services.angle_calc import ang_bw_two_vects
-
+import os
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -275,10 +275,10 @@ class Ray_obstacle:
         data = self.filter_complex_obstacle(diff_vecs=diff_vecs, data=data, mode='transmit')
         data_output = tuple()
         for i in range(n_of_chips):
-            newdata = ((self.parallax_beta(diff_vecs=data[i][0], data=data[i], normals=normals, vecs=vecs[i],
+            newdata = (self.parallax_beta(diff_vecs=data[i][0][0], data=data[i][0], normals=normals, vecs=vecs[i],
                                            wavelength=wavelength, chip_thickness=self.chip_thickness,
                                            vec_origin_to_centre=vecs_origin_to_centre[i], width=self.chip_width,
-                                           height=self.chip_height),),)
+                                           height=self.chip_height),)
             data_output += newdata
         return data_output
 
@@ -294,7 +294,7 @@ class Ray_obstacle:
                       diameter: Optional[float] = None,
                       vec_origin_to_centre: Optional[np.ndarray] = None) -> Tuple[np.ndarray, ...]:
 
-        with open('lin_att.txt', 'r') as file:
+        with open(os.path.join('obstacles','lin_att.txt'), 'r') as file:
             lin_att = np.loadtxt(StringIO(file.read()))
             lin_att_coeff = lin_att[:, 1][np.argmin(np.abs(lin_att[:, 0] - wavelength))]
 
@@ -346,7 +346,7 @@ class Ray_obstacle:
             path = xyzf - xyzb
             path_len = np.sqrt(path[:, 0] ** 2 + path[:, 1] ** 2 + path[:, 2] ** 2)
             intensity = np.exp(-lin_att_coeff * path_len).reshape(-1, 1)
-            data_output += (intensity,)
+            data_output += (intensity,intersection)
             return data_output
 
         elif self.geometry == 'circle':
