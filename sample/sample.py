@@ -11,7 +11,7 @@ from services.angle_calc import ang_bw_two_vects
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-class Sample():
+class Sample:
     def __init__(self,
                  orient_matx: Optional[np.ndarray] = None,
                  a: Optional[float] = None,
@@ -84,6 +84,13 @@ class Sample():
         dot_prod = np.dot(vec1, vec2)
         angle = np.arccos(dot_prod / np.linalg.norm(vec1) / np.linalg.norm(vec2))
         return np.rad2deg(angle)
+
+    @property
+    def cell_parameters(self):
+        if hasattr(self, 'parameters'):
+            return {prm_n:prm for prm_n, prm in zip(('a','b','c','al','bt','gm'),self.parameters)}
+        else:
+            return
 
     @staticmethod
     def generate_rotation_matrices(
@@ -269,7 +276,7 @@ class Sample():
     ) -> Tuple[float, float, str]:
         if not start_rad and not end_rad:
             start_rad = np.deg2rad(start_angle) % (2 * np.pi)
-            sweep_rad = np.deg2rad(scan_sweep)
+            sweep_rad = np.deg2rad(scan_sweep) #% (2 * np.pi)
 
             end_rad = start_rad + sweep_rad
 
@@ -380,7 +387,7 @@ class Sample():
              hkl_array_orig: Optional[np.ndarray] = None,
              wavelength: float = 0.71073,
              only_angles: bool = False,
-             lorentz_minimum: Optional[float] = 0.0) -> Union[Tuple[np.ndarray, np.ndarray],
+             lorentz_minimum: Optional[float] = 0.00) -> Union[Tuple[np.ndarray, np.ndarray],
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         if hkl_array is None:
             raise Exception('hkl_array is None, please provide some reflections as numpy array object (-1,3)')
@@ -493,21 +500,21 @@ class Sample():
                        n_of_scan: int) -> np.ndarray:
 
         if directions[n_of_scan] == 'x':
-            scan_axis = np.array([1, 0, 0])
+            scan_axis = np.array([1., 0, 0])
         elif directions[n_of_scan] == 'y':
-            scan_axis = np.array([0, 1, 0])
+            scan_axis = np.array([0, 1., 0])
         else:
-            scan_axis = np.array([0, 0, 1])
+            scan_axis = np.array([0, 0, 1.])
 
-        vec_rotations = rotations[:n_of_scan][::-1]
+        vec_rotations = rotations[n_of_scan+1:]
         angles = list(np.array(angles) * np.array(directions))
-        angles_rotation = angles[:n_of_scan][::-1]
+        angles_rotation = angles[n_of_scan+1:]
         if len(vec_rotations) == 0:
             pass
         else:
             rot_matr = R.from_matrix(np.eye(3))
             for i, rot in enumerate(vec_rotations):
-                rotation = R.from_euler(rot, -angles_rotation[i], degrees=True)
+                rotation = R.from_euler(rot, angles_rotation[i], degrees=True)
                 rot_matr = rotation * rot_matr
             scan_axis = rot_matr.apply(scan_axis)
         return scan_axis

@@ -14,7 +14,8 @@ from logger.my_logger import mylogger
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from services.encode_hkl import encode_hkl
-
+from experiment.collisioncheck import LogicCollision
+from experiment.optimization import OptimizationManager
 
 class Experiment:
 
@@ -35,8 +36,6 @@ class Experiment:
         self.axes_directions = None
         self.axes_real = None
         self.axes_angles = None
-        self.logic_collision = None
-        self.check_logic_collision = False
         self.det_geometry = None
         self.det_diameter = None
         self.det_width = None
@@ -51,6 +50,8 @@ class Experiment:
         self.incident_beam_vec = np.array([1., 0., 0.])
         self.cdcc = sf.CumulativeDataCalculator()
         self.linked_obstacles = list()
+        self.collision_handler = LogicCollision(upd_on_ch=True)
+        self.opt_man = OptimizationManager(self)
 
     def set_wavelength(self, wavelength):
         self.wavelength = wavelength
@@ -174,25 +175,18 @@ class Experiment:
             else:
                 pass
 
-    def create_report(self, data):
-        report = ''
-        for i in data:
-            check_failed = f'Run {i[0]} failed the following checks :\n' + '\n'.join(
-                [', '.join(j) for j in i[1]]) + '\n'
-            report += check_failed
-        return report
 
     @mylogger(level='DEBUG', log_args=True)
     def calc_experiment(self, d_range=None, hkl_section=None):
-        if self.check_logic_collision and self.logic_collision is not None:
-            self.check_collision_v2()
+        if self.collision_handler.active:
+            self.collision_handler.check(exp_inst=self)
+
         if d_range and hkl_section is None or not None:
             pass
         if d_range and hkl_section is None:
 
             self.hkl_in_d_range, self.hkl_origin_in_d_range = self.cell.gen_hkl_arrays(type='d_range', d_range=d_range,
-                                                                                       return_origin=True,
-                                                                                       pg=self.pg,
+                                                                                       return_origin=True, pg=self.pg,
                                                                                        centring=self.centring)
 
             if self.diamond_anvil and self.calc_anvil_flag:
@@ -216,7 +210,7 @@ class Experiment:
 
         self.strategy_data_container.clear_data()
         for scan_n, scan in enumerate(self.scans):
-            data = self.cell.scan(scan_type='???', no_of_scan=scan[4],
+            data = self.cell.scan(no_of_scan=scan[4],
                                   scan_sweep=scan[5],
                                   wavelength=self.wavelength,
                                   angles=scan[3], hkl_array=hkl_in,
@@ -251,7 +245,7 @@ class Experiment:
                 for obstacle in self.obstacles:
                     obstacle_ = self._create_obstacle(obstacle)
                     data = obstacle_.filter(diff_vecs=data[0], data=data, mode='shade')
-            scan_container = sf.ScanDataContainer(diff_vecs=data[0], hkl=data[1], hkl_origin=data[2],
+            scan_container = sf.ScanDataContainer(scan=scan,diff_vecs=data[0], hkl=data[1], hkl_origin=data[2],
                                                   diff_angles=data[3],
                                                   scan_setup=scan, start_angle=scan[3][scan[4]], sweep=scan[5])
             self.strategy_data_container.add_scan_data_container(sdc=scan_container)
@@ -312,7 +306,7 @@ class Experiment:
             d_max_ = max(d_array)
             hkl_array_orig = sf.generate_original_hkl_for_hkl_array(hkl_array, pg=pg, parameters=self.parameters,
                                                                     centring=centring)
-            sdc = sf.ScanDataContainer(diff_vecs=None, hkl=hkl_array, hkl_origin=hkl_array_orig, diff_angles=None,
+            sdc = sf.ScanDataContainer(scan=None,diff_vecs=None, hkl=hkl_array, hkl_origin=hkl_array_orig, diff_angles=None,
                                        scan_setup=None, start_angle=None, sweep=None)
             self.strategy_data_container.add_scan_data_container(sdc)
             if d_min is None or d_min > d_min_: d_min = d_min_
@@ -526,10 +520,16 @@ class Experiment:
                                     check_collisions=False, factor_detector=False, factor_obstacles=True, det_prm=None):
         x_vals, z_vals = sf.prepare_xy_grid_flatten(xy_ranges=xz_ranges, xy_steps=xz_steps)
         detector, obstacles = self._prepare_detector_obstacles_modules(factor_detector, factor_obstacles, det_prm)
-        if check_collisions and self.logic_collision:
+        if self.collision_handler.active:
             names = [self.axes_names[i] for i in yxz_rotations[1:]]
-            bool_mask = self._generate_boolean_mask_collision_scheme(angles=(x_vals, z_vals), names=names,
-                                                                     initial_angles=initial_angles, detector=detector)
+
+            bool_mask = self.collision_handler.generate_boolean_mask(
+                exp_inst=self,
+                angles=(x_vals, z_vals),
+                names=names,
+                initial_angles=initial_angles,
+                detector=detector
+            )
             x_vals = x_vals[bool_mask].reshape(-1)
             z_vals = z_vals[bool_mask].reshape(-1)
 
@@ -542,11 +542,15 @@ class Experiment:
                                                                                 all_rotations=self.axes_rotations)
         names = [self.axes_names[i] for i in yxz_rotations]
         anglesy = np.rad2deg(anglesy)
-        if check_collisions and self.logic_collision:
-            bool_mask = self._generate_boolean_mask_collision_scheme(
+        if self.collision_handler.active:
+
+            bool_mask = self.collision_handler.generate_boolean_mask(
+                exp_inst=self,
                 angles=(anglesy.copy(), anglesx.reshape(-1), anglesz.reshape(-1)),
-                names=names, initial_angles=initial_angles,
-                detector=detector)
+                names=names,
+                initial_angles=initial_angles,
+                detector=detector
+            )
             anglesx = anglesx[bool_mask.reshape(-1, 1)[:, 0]]
             anglesz = anglesz[bool_mask.reshape(-1, 1)[:, 0]]
             anglesy = anglesy[bool_mask.reshape(-1, 1)[:, 0]]
@@ -565,8 +569,10 @@ class Experiment:
 
         name = [self.axes_names[rotation]]
         angles_array = np.rad2deg(angles_array)
-        if check_collisions and self.logic_collision:
-            bool_mask = self._generate_boolean_mask_collision_scheme(
+        if self.collision_handler.active:
+
+            bool_mask = self.collision_handler.generate_boolean_mask(
+                exp_inst=self,
                 angles=(angles_array,),
                 names=name,
                 initial_angles=initial_angles,
@@ -583,10 +589,15 @@ class Experiment:
                                     check_collisions=False, factor_detector=False, factor_obstacles=True, det_prm=None):
         x_vals = np.arange(x_range[0], x_range[1], x_step)
         detector, obstacles = self._prepare_detector_obstacles_modules(factor_detector, factor_obstacles, det_prm)
-        if check_collisions and self.logic_collision:
+        if self.collision_handler.active:
             names = (self.axes_names[yx_rotations[1]])
-            bool_mask = self._generate_boolean_mask_collision_scheme(angles=(x_vals,), names=names,
-                                                                     initial_angles=initial_angles, detector=detector)
+
+            bool_mask = self.collision_handler.generate_boolean_mask(
+                exp_inst=self,
+                angles=(x_vals,),
+                names=names,
+                initial_angles=initial_angles,
+                detector=detector)
             x_vals = x_vals[bool_mask].reshape(-1)
         diff_vecs_array, anglesy, hkl_array, anglesx = self.cell.map_2d_v2(reflections=reflections,
                                                                            yx_rotations=yx_rotations,
@@ -597,8 +608,10 @@ class Experiment:
                                                                            all_rotations=self.axes_rotations)
         names = (self.axes_names[i] for i in yx_rotations)
         anglesy = np.rad2deg(anglesy)
-        if check_collisions and self.logic_collision:
-            bool_mask = self._generate_boolean_mask_collision_scheme(
+        if self.collision_handler.active:
+
+            bool_mask = self.collision_handler.generate_boolean_mask(
+                exp_inst=self,
                 angles=(anglesy, anglesx.reshape(-1)),
                 names=names,
                 initial_angles=initial_angles,
@@ -652,42 +665,6 @@ class Experiment:
             axis_titles=yxz_names
         )
 
-    @mylogger('DEBUG', log_args=True)
-    def _generate_boolean_mask_collision_scheme(self, angles, names, initial_angles, detector):
-        if detector:
-            detector_dict = {'d_dist': detector.dist, 'det_ang_x': detector.rot[0], 'det_ang_y': detector.rot[1],
-                             'det_ang_z': detector.rot[2], 'det_orient': detector.orientation,
-                             'det_disp_y': detector.disp_y, 'det_disp_z': detector.disp_z}
-        else:
-            detector_dict = {}
-
-        angles_dict = dict(zip(self.axes_names, initial_angles))
-        for angles_, name in zip(angles, names):
-            angles_dict[name] = angles_
-        additional_operations = {'abs': abs}
-        variables_dict = {**detector_dict, **angles_dict, **additional_operations}
-        collisions = [i for i in self.logic_collision if i.get('static_angle', False)]
-
-        overall_mask = True
-        for n_block, block in enumerate(collisions):
-            try:
-                if (not block['pre_condition'] or
-                        all(sf.logic_eval(check, variables_dict) for check in block['pre_condition'])):
-                    block_bool_mask = True
-                    for subblock in block['condition']:
-                        subblock_bool_mask = True
-                        for check in subblock:
-                            try:
-                                check_mask = sf.logic_eval(check, variables_dict)
-                                subblock_bool_mask &= check_mask
-                            except:
-                                subblock_bool_mask &= True
-                        block_bool_mask &= subblock_bool_mask
-                    overall_mask &= block_bool_mask
-            except:
-                overall_mask &= True
-        return overall_mask
-
     def separate_unique_common(self):
         assert len(self.strategy_data_container.scan_data_containers) >= 2, 'Provide at least 2 scan'
         # TODO make appropriate error handling
@@ -719,27 +696,29 @@ class Experiment:
 
         self.strategy_data_container.clear_data()
         for scan, scan_unique_list_ in zip(old_data_hkl, unique_lists):
-            sdc_old = sf.ScanDataContainer(diff_vecs=None, diff_angles=None, hkl=scan[0], hkl_origin=scan[1],
+            sdc_old = sf.ScanDataContainer(scan=None,diff_vecs=None, diff_angles=None, hkl=scan[0], hkl_origin=scan[1],
                                            scan_setup=None, start_angle=None, sweep=None)
             self.strategy_data_container.add_scan_data_container(sdc_old)
             for unique_ in scan_unique_list_:
-                sdc_unique = sf.ScanDataContainer(diff_vecs=None, diff_angles=None, hkl=unique_[0],
+                sdc_unique = sf.ScanDataContainer(scan=None,diff_vecs=None, diff_angles=None, hkl=unique_[0],
                                                   hkl_origin=unique_[1], scan_setup=None, start_angle=None, sweep=None)
                 self.strategy_data_container.add_scan_data_container(sdc_unique)
 
-        sdc_intersec = sf.ScanDataContainer(diff_vecs=None, diff_angles=None, hkl=hkl_intersec,
+        sdc_intersec = sf.ScanDataContainer(scan=None,diff_vecs=None, diff_angles=None, hkl=hkl_intersec,
                                             hkl_origin=hkl_origin_intersec, scan_setup=None, start_angle=None,
                                             sweep=None)
         self.strategy_data_container.add_scan_data_container(sdc_intersec)
         for i, j in zip(self.strategy_data_container.get_hkl(), self.strategy_data_container.get_hkl_origin()):
             print(f'hkl shape: {i.shape} hkl_o shape{j.shape}')
 
+    @mylogger(log_args=True)
     def set_logic_collision(self, collision_list):
-        self.logic_collision = collision_list
-        pass
+        self.collision_handler.active = True
+        self.collision_handler.rules = collision_list
 
     def del_logic_collision(self):
-        self.logic_collision = None
+        self.collision_handler.active = False
+        self.collision_handler.rules = None
 
     def _get_filtered_hkl_origin(self, runs='all'):
         hkl_origin_list = self.strategy_data_container.get_hkl_origin()
@@ -825,7 +804,7 @@ class Experiment:
         return fig
 
     def json_export(self, object_):
-        objects = [ 'obstacles', 'linked_obstacles', 'detector', 'goniometer', 'wavelength', 'instrument', 'runs', ]
+        objects = ['obstacles', 'linked_obstacles', 'detector', 'goniometer', 'wavelength', 'instrument', 'runs', ]
         assert object_ in objects, f'object of export may be: {(", ").join(objects)}'
         match object_:
             case 'obstacles':
@@ -895,12 +874,12 @@ class Experiment:
         return table_data, table_num
 
     def _load_linked_obstacles(self, data_, table_num):
-        dicts_check = all([sf.check_obstacle_dict(obst,linked=True) for obst in data_])
+        dicts_check = all([sf.check_obstacle_dict(obst, linked=True) for obst in data_])
         axes_dict = {key: val for key, val in enumerate(self.axes_names)}
         if dicts_check:
             table_data = []
             for obst in data_:
-                table = apg.generate_obst_table(n_cl=table_num, data=obst,linked=True,axes_dict=axes_dict)
+                table = apg.generate_obst_table(n_cl=table_num, data=obst, linked=True, axes_dict=axes_dict)
                 table_num += 1
                 rot = (obst['rotation_x'], obst['rotation_y'], obst['rotation_z'])
                 obst.pop('rotation_x')
@@ -1005,7 +984,8 @@ class Experiment:
             data_output['obstacles'] = None
         if linked_obstacles:
             if linked_obstacles[0]['distance']:
-                data_linked_obstacles = self.load_instrument_unit(linked_obstacles,'linked_obstacles',table_num=table_num)
+                data_linked_obstacles = self.load_instrument_unit(linked_obstacles, 'linked_obstacles',
+                                                                  table_num=table_num)
                 data_output['linked_obstacles'] = data_linked_obstacles
                 table_num += data_linked_obstacles[1]
             else:
@@ -1014,57 +994,8 @@ class Experiment:
         return data_output
 
     def check_collision_v2(self, scans=None, type_='highest'):
-        scans = self.scans if scans is None else scans
 
-        global_flag = True
-        collisions = {}
-        for scan_n, scan in enumerate(scans):
-            scan_name = self.axes_names[int(scan[4])]
-            additional_operations = {'abs': abs}
-            angles_dict = dict(zip(self.axes_names, scan[3]))
-            variables_dict = {'d_dist': scan[0], 'det_ang_x': scan[1][0], 'det_ang_y': scan[1][1],
-                              'det_ang_z': scan[1][2], 'det_orient': scan[2],
-                              'scan_ax': scan_name, 'sweep': scan[5], 'det_disp_y': scan[6], 'det_disp_z': scan[7]}
-            variables_dict = {**variables_dict, **angles_dict, **additional_operations}
-            for n_block, block in enumerate(self.logic_collision):
-                if (not block['pre_condition'] or
-                        all(sf.logic_eval(check, variables_dict) for check in block['pre_condition'])):
-                    block_flag = True
-                    for subblock in block['condition']:
-                        subblock_flag = True
-                        for check in subblock:
-                            element_flag = sf.logic_eval(check, variables_dict)
-                            if not element_flag:
-                                subblock_flag = False
-                                break
-                        if subblock_flag:
-                            block_flag = True
-                            break
-                        block_flag = False
-                    if not block_flag:
-                        if scan_n not in collisions:
-                            collisions[scan_n] = [block]
-                        else:
-                            collisions[scan_n].append(block)
-                        global_flag = False
-
-        if not global_flag:
-            report_body_add = self._create_collision_report(collisions, type_)
-            report = MODAL_TUPLE(header=calc_collision_error.header,
-                                 body=''.join((calc_collision_error.body, *report_body_add)))
-            raise CollisionError(report)
-
-    def _create_collision_report(self, report_list, type_='highest'):
-        report_str = ''
-        for scan in report_list.keys():
-            highest_level = min((i['level'] for i in report_list[scan]))
-            report_str += f'scan_{scan}:\n'
-            for report in report_list[scan]:
-                if type_ == 'highest' and report['level'] == highest_level:
-                    report_str += f'{report["name"]}:\n{report["problem"]}\n'
-                if type_ == 'all':
-                    report_str += f'{report["name"]}\n{report["problem"]}\n'
-        return report_str
+        self.collision_handler.check(exp_inst=self, scans=scans, type_=type_)
 
     def load_scans(self, data_, table_num):
         if self.axes_rotations is None:
@@ -1078,8 +1009,10 @@ class Experiment:
             run_dict = sf.extract_run_data_into_list(run)
             runs_list.append(run_dict)
 
-        if self.logic_collision and self.check_logic_collision:
-            sf.check_collision(self, runs_list)
+        if self.collision_handler.active:
+
+            self.collision_handler.check(exp_inst=self, scans=runs_list)
+
         self.scans = []
         for run_dict in runs_list:
             self.add_scan(**run_dict)
@@ -1108,51 +1041,80 @@ class Experiment:
     def clear_linked_obstacles(self):
         self.linked_obstacles = []
 
+    def restore_runs_tables(self, table_num=0):
+        """
+        Генерирует HTML таблицы для текущих сканов, хранящихся в self.scans.
+        Используется для восстановления отображения при переходе на страницу.
+        """
+        if not self.runs_are_set():
+            return [], table_num
+
+        runs_dicts = sf.generate_scans_dicts_list(exp_inst=self)
+
+        runs_dicts_prepared = sf.generate_data_for_runs_table(runs_dicts, table_num=table_num)
+
+        runs_tables = []
+        for run in runs_dicts_prepared:
+            table = apg.gen_run_table(
+                axes_angles=self.axes_angles,
+                real_axes=self.axes_real,
+                rotations=self.axes_rotations,
+                names=self.axes_names,
+                table_num=table_num,
+                data=run
+            )
+            table_num += 1
+            runs_tables.append(table)
+
+        return runs_tables, table_num
+
+    def opt_select_scan(self, scan_index):
+        """
+        Выбрать скан для оптимизации.
+        Возвращает plotly Figure (Heatmap).
+        """
+        return self.opt_man.select_scan(scan_index)
+
+    def opt_apply_parameters(self, start_angle, sweep):
+        """
+        Применить новые параметры (start_angle, sweep) к выбранному скану.
+        Возвращает обновленный plotly Figure.
+        """
+        return self.opt_man.apply_parameters(start_angle, sweep)
+
+    def opt_revert(self):
+        """
+        Отменить изменения параметров для выбранного скана.
+        Возвращает исходный plotly Figure.
+        """
+        return self.opt_man.revert_changes()
+
+    def opt_select_graph_type(self, metric):
+        """
+        Сменить тип графика: 'completeness', 'redundancy', 'multiplicity'.
+        Возвращает обновленный plotly Figure.
+        """
+        return self.opt_man.select_graph_type(metric)
+
+    def opt_toggle_base_run(self, scan_index, active):
+        """
+        Включает/выключает скан из расчета фона.
+        active: True (включить) / False (исключить).
+        Возвращает обновленный Figure.
+        """
+        return self.opt_man.toggle_base_run(scan_index, active)
+
+    def opt_get_base_runs(self):
+        """
+        Возвращает set с индексами активных базовых сканов.
+        Нужен для правильной отрисовки цветов кнопок.
+        """
+
+        return self.opt_man._optimizer.base_runs
+
+    def init_optimizer(self):
+
+        all_indices = set(range(len(self.scans)))
+        self.opt_man._optimizer.base_runs = all_indices
 
 import services.service_functions as sf
-
-if __name__ == '__main__':
-    exp2 = Experiment()
-    parameters = [10, 10, 10, 90., 90., 90.]
-    # exp2.set_cell(matr=UB)
-    exp2.set_cell(parameters=parameters, om_chi_phi=(0, 0, 0))
-    exp2.set_pg('2/m')
-    exp2.set_centring('P')
-    exp2.set_wavelength(0.710730)
-    goniometer_system = 'zxz'
-    angles = [
-        [0., 0., 0.],
-
-        # [120, 54.71, 0],
-        #
-        # [240, 54.71, 0],
-        # [0, 0, 20, -90],
-        # [0, 0, 40, -90],
-        # [0, 0, 60, -90],
-        # [0, 0, 80, -90],
-    ]
-    sweeps = [
-        50,
-        # 100,
-        # 150
-    ]
-    rotation_dirs = (-1, -1, 1)
-    # aperture = 40
-    # anvil_normal = np.array([1., 0., 0.])
-    # exp2.add_linked_obstacle(highest_linked_axis_index=0,width=100,height=100,distance=40,geometry='circle',orientation='independent',rot=(0,0,0),
-    #                          displacement_y=0,displacement_z=0,name='chupacabra', diameter=100)
-    exp2.add_linked_obstacle(linked_axis=0, width=100, height=100, distance=40, geometry='circle', orientation='normal',
-                             rot=(0, 0, 0),
-                             displacement_y=0, displacement_z=0, name='chupacabra', diameter=100)
-    exp2.set_goniometer(goniometer_system, axes_directions=rotation_dirs, axes_real=['true'], axes_angles=[0],
-                        axes_names=['a', 'b', 'omega'])
-    for angle, sweep in zip(angles, sweeps):
-        exp2.add_scan(det_dist=95, det_angles=[0, 0, 25], det_orientation='normal', axes_angles=angle, scan=2,
-                      sweep=sweep, )
-
-    # exp2.set_diamond_anvil(aperture=aperture,anvil_normal=anvil_normal)
-    # exp2.calc_anvil_flag=True
-    exp2.calc_experiment(d_range=(0.68, 20))
-    fig = exp2.generate_known_hkl_3d()
-    fig.show()
-    # data_list = []

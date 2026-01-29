@@ -25,7 +25,7 @@ def get_compilation_args(module_name):
 
     # Individual settings for each module
     module_settings = {
-        'rotation_apply': {
+        'rotation': {
             'extra_compile_args': base_compile_args + (["/fp:precise"] if sys.platform == "win32" else []),
             'extra_link_args': extra_link_args,
             'libraries': libraries
@@ -72,7 +72,7 @@ def get_compilation_args(module_name):
 def get_all_extensions(selected_modules=None):
     """Get extensions for selected modules"""
     all_modules = {
-        'rotation_apply': {
+        'rotation': {
             'sources': ["rotation.pyx"],
             'include_dirs': [np.get_include()]
         },
@@ -127,7 +127,7 @@ def parse_arguments():
     parser.add_argument('-a', '--all', action='store_true',
                         help='Compile all modules')
     parser.add_argument('-m', '--modules', nargs='+',
-                        choices=['rotation_apply', 'hkl_pg_generation', 'vec_mx_rot',
+                        choices=['rotation', 'hkl_pg_generation', 'vec_mx_rot',
                                  'circ_link_obst_i', 'circ_link_obst_n', 'rctngl_link_obst',
                                  'calc_lorentz_coefficient'],
                         help='Compile selected modules')
@@ -148,7 +148,7 @@ def main():
 
     if args.list:
         print("Available modules for compilation:")
-        for module_name in ['rotation_apply', 'hkl_pg_generation', 'vec_mx_rot',
+        for module_name in ['rotation', 'hkl_pg_generation', 'vec_mx_rot',
                             'circ_link_obst_i', 'circ_link_obst_n', 'rctngl_link_obst',
                             'calc_lorentz_coefficient']:
             print(f"  - {module_name}")
@@ -156,7 +156,7 @@ def main():
 
     if args.help_modules:
         print("Modules help:")
-        print("  rotation_apply           - /fp:precise")
+        print("  rotation                 - /fp:precise")
         print("  hkl_pg_generation        - /fp:precise")
         print("  vec_mx_rot               - /fp:precise")
         print("  circ_link_obst_i         - /fp:fast, C++")

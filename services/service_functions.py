@@ -10,7 +10,6 @@ import plotly.express as px
 import warnings
 from scipy.spatial.transform import Rotation as R
 import base64
-from experiment.experiment import Experiment
 import json
 from services.exceptions.exceptions import RunsDictError, HKLFormatError, WrongHKLShape, CalcCumulativeCompletenessError
 from assets.modals_content import *
@@ -20,6 +19,7 @@ import re
 from collections import defaultdict
 from obstacles.obstacle import Ray_obstacle
 from obstacles.linked_obstacle import LinkedObstacle
+
 
 def load_hklf4(hkl_str: str, trash_zero: bool = True) -> np.ndarray:
     try:
@@ -77,7 +77,7 @@ def generate_original_hkl_for_hkl_array(hkl_array: np.ndarray, pg: str, paramete
                                                        centring=centring)
     generated_hkl_encoded_array = encode_hkl(hkl_array_)
     hkl_encoded_array = encode_hkl(hkl_array).reshape(-1)
-    sort_idx = np.argsort(generated_hkl_encoded_array,0)
+    sort_idx = np.argsort(generated_hkl_encoded_array, 0)
     sorted_hkl = generated_hkl_encoded_array[sort_idx].reshape(-1)
     sorted_hkl_o = hkl_array_orig[sort_idx.reshape(-1, 1)[:, 0]]
     indices = np.searchsorted(sorted_hkl, hkl_encoded_array).reshape(-1, 1)
@@ -1186,18 +1186,24 @@ def parse_logic_exp_txt(exp_str: str, block_sep: str = ';', subblock_sep: str = 
     return subblocks
 
 
-@mylogger(log_args=True)
-def logic_eval(string_expression: str, variables: Dict[str, Any] = {}) -> bool:
+
+
+def safe_eval(string_expression: str, variables: Dict[str, Any] = {}) -> float:
     code = compile(string_expression, "<string>", "eval")
     for name in code.co_names:
         if name not in variables:
             raise NameError(f"Usage of {name} is not allowed.")
-    result = eval(code, {"__builtins__": {}}, variables)
+    return eval(code, {"__builtins__": {}}, variables)
+
+@mylogger(log_args=False)
+def logic_eval(string_expression: str, variables: Dict[str, Any] = {}) -> bool:
+    result = safe_eval(string_expression, variables)
     if (isinstance(result, (bool, np.bool_)) or
             (isinstance(result, np.ndarray) and result.dtype == bool)):
         return result
     else:
         raise TypeError(f"Result of expression should be bool or logic ndarray, not {type(result)}")
+
 
 
 def parse_p4p_for_UB(str_data: str) -> Optional[np.ndarray]:
@@ -1290,6 +1296,7 @@ def process_dcc_upload_file_to_str(contents: str) -> str:
 
 
 def generate_str_for_det_download(experiment_instance: Any) -> str:
+    from experiment.experiment import Experiment
     if not isinstance(experiment_instance, Experiment):
         raise TypeError(f'{experiment_instance} is not an instance of {Experiment}')
     det_geometry = experiment_instance.det_geometry
@@ -1408,6 +1415,7 @@ def generate_data_for_detector_table(diameter: Optional[float] = None, height: O
 
 
 def generate_dicts_for_obst(exp_inst: Any) -> List[Dict[str, Any]]:
+    from experiment.experiment import Experiment
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
     dummy = [[*[None, ] * 8, [None, None, None], None], ]
@@ -1421,7 +1429,9 @@ def generate_dicts_for_obst(exp_inst: Any) -> List[Dict[str, Any]]:
         obst_dicts.append(obstacle_dict)
     return obst_dicts
 
+
 def generate_dicts_for_linked_obst(exp_inst: Any) -> List[Dict[str, Any]]:
+    from experiment.experiment import Experiment
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
     obstacle_parameters = ['distance', 'geometry', 'orientation', 'displacement_y', 'displacement_z', 'height', 'width',
@@ -1430,13 +1440,15 @@ def generate_dicts_for_linked_obst(exp_inst: Any) -> List[Dict[str, Any]]:
         obstacle_list = exp_inst.linked_obstacles
         obst_dicts = []
         for obst in obstacle_list:
-            obst = [obst.dist,obst.geometry,obst.orientation,obst.disp_y,obst.disp_z, obst.height,obst.width, obst.diameter,
-                    obst.highest_linked_axis_index,*obst.rot,obst.name]
+            obst = [obst.dist, obst.geometry, obst.orientation, obst.disp_y, obst.disp_z, obst.height, obst.width,
+                    obst.diameter,
+                    obst.highest_linked_axis_index, *obst.rot, obst.name]
             obstacle_dict = dict(zip(obstacle_parameters, obst))
             obst_dicts.append(obstacle_dict)
         return obst_dicts
     else:
-        return [dict(zip(obstacle_parameters,[*[None]*len(obstacle_parameters)]))]
+        return [dict(zip(obstacle_parameters, [*[None] * len(obstacle_parameters)]))]
+
 
 def check_goniometer_dict(dict_: Dict[str, Any]) -> bool:
     if not dict_has_keys(dict_, ['axes_names', 'axes_directions', 'axes_rotations', 'axes_angles', 'axes_real']):
@@ -1450,6 +1462,7 @@ def check_goniometer_dict(dict_: Dict[str, Any]) -> bool:
 
 
 def generate_dicts_for_goniometer(exp_inst: Any) -> List[Dict[str, Any]]:
+    from experiment.experiment import Experiment
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
     axes_list = []
@@ -1478,6 +1491,7 @@ def generate_dicts_for_goniometer(exp_inst: Any) -> List[Dict[str, Any]]:
 
 
 def generate_det_dict(exp_inst: Any) -> Dict[str, Any]:
+    from experiment.experiment import Experiment
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
     detector_dict = {
@@ -1496,6 +1510,7 @@ def generate_det_dict(exp_inst: Any) -> Dict[str, Any]:
 
 
 def generate_scans_dicts_list(exp_inst: Any) -> List[Dict[str, Any]]:
+    from experiment.experiment import Experiment
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
     runs_list = []
@@ -1548,31 +1563,133 @@ def extract_run_data_into_list(dict_: Dict[str, Any]) -> Dict[str, Any]:
     return run
 
 
-@mylogger(log_args=True)
-def process_runs_to_dicts_list(runs: List[List[Any]]) -> List[Dict[str, Any]]:
+def _to_float(val: Any) -> Optional[float]:
+    """Преобразует в float. 0.0 остается 0.0. Пустая строка или None становятся None."""
+    if val is None or val == "":
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+def _to_int(val: Any) -> Optional[int]:
+    """Преобразует в int. 0 остается 0. Пустая строка или None становятся None."""
+    if val is None or val == "":
+        return None
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
+
+def _to_str(val: Any) -> Optional[str]:
+    """Преобразует в str. Пустая строка или None становятся None."""
+    if val is None or val == "":
+        return None
+    return str(val)
+
+def process_runs_to_dicts_list(table_data_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Парсит строки таблицы.
+    Все пустые значения становятся None.
+    Значение 0 (ноль) сохраняется как число.
+    """
     data_ = []
-    for run in runs:
-        axes_angles = [i for i in run[9:]]
-        dict_ = {'det_dist': run[1], 'det_angles': (run[3], run[4], run[5]), 'det_orientation': run[2],
-                 'axes_angles': axes_angles,
-                 'scan': int(run[0]), 'sweep': run[8], 'det_disp_y': run[6], 'det_disp_z': run[7]}
-        data_.append(dict_)
+
+    for row in table_data_rows:
+        # Инициализируем всё как None
+        current_run = {
+            'det_dist': None,
+            'det_angles_list': [None, None, None], # [x, y, z]
+            'det_orientation': None,
+            'axes_map': {},
+            'scan': None,
+            'sweep': None,
+            'disp_y': None,
+            'disp_z': None
+        }
+
+        for key, value in row.items():
+            if not key:
+                continue
+
+            match key:
+                case k if 'scan_no' in k:
+                    current_run['scan'] = _to_int(value)
+
+                case k if 'scan_sweep' in k:
+                    current_run['sweep'] = _to_float(value)
+
+                case k if 'det_dist' in k:
+                    current_run['det_dist'] = _to_float(value)
+
+                case k if 'det_orientation' in k:
+                    current_run['det_orientation'] = _to_str(value)
+
+                # --- Углы детектора ---
+                case k if 'det_rot_x' in k:
+                    current_run['det_angles_list'][0] = _to_float(value)
+                case k if 'det_rot_y' in k:
+                    current_run['det_angles_list'][1] = _to_float(value)
+                case k if 'det_rot_z' in k:
+                    current_run['det_angles_list'][2] = _to_float(value)
+
+                # --- Смещения ---
+                case k if 'det_disp_y' in k:
+                    current_run['disp_y'] = _to_float(value)
+                case k if 'det_disp_z' in k:
+                    current_run['disp_z'] = _to_float(value)
+
+                # --- Оси гониометра ---
+                # Ключ вида "0_2_rot", исключаем "det"
+                case k if '_rot' in k and 'det' not in k:
+                    parts = k.split('_')
+                    if len(parts) >= 3:
+                        try:
+                            axis_idx = int(parts[-2])
+                            # Здесь тоже важно сохранить 0, если он введен
+                            current_run['axes_map'][axis_idx] = _to_float(value)
+                        except ValueError:
+                            pass
+
+        # --- Финализация ---
+
+        # Собираем оси. Если какой-то оси не было в словаре, она не попадет в список.
+        # Если в ячейке было пусто -> value=None -> в axes_map попадет None.
+        sorted_axes_angles = [
+            current_run['axes_map'][i]
+            for i in sorted(current_run['axes_map'].keys())
+        ]
+
+        final_dict = {
+            'det_dist': current_run['det_dist'],
+            'det_angles': tuple(current_run['det_angles_list']), # (None, 0.5, None) например
+            'det_orientation': current_run['det_orientation'],
+            'axes_angles': sorted_axes_angles,
+            'scan': current_run['scan'],
+            'sweep': current_run['sweep'],
+            'det_disp_y': current_run['disp_y'],
+            'det_disp_z': current_run['disp_z']
+        }
+
+        data_.append(final_dict)
+
     return data_
 
 
 def check_run_dict_temp(run: Dict[str, Any]) -> None:
-    if any((run['det_dist'] == '', run['det_angles'][0] == '', run['det_angles'][1] == '', run['det_angles'][2] == ''
-            , run['det_orientation'] == '', run['scan'] == '', run['scan'] == '', run['sweep'] == '',
+    if any((run['det_dist'] == None, run['det_angles'][0] == None, run['det_angles'][1] == None, run['det_angles'][2] == None
+                , run['det_orientation'] == None, run['scan'] == None, run['scan'] == None, run['sweep'] == None,
             run['sweep'] == 0)):
         raise RunsDictError(add_runs_empty_error)
-    if run['det_orientation'] == 'independent' and (run['det_disp_y'] == '' or run['det_disp_z'] == ''):
+    if run['det_orientation'] == 'independent' and (run['det_disp_y'] == None or run['det_disp_z'] == None):
         raise RunsDictError(add_runs_empty_error)
-    if any([angle == '' for angle in run['axes_angles']]):
+    if any([angle == None for angle in run['axes_angles']]):
         raise RunsDictError(add_runs_empty_gon_error)
 
 
 @mylogger(log_args=True)
 def check_collision(exp_inst: Any, runs: List[Dict[str, Any]]) -> None:
+    from experiment.experiment import Experiment
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
     runs_to_check = []
@@ -1584,6 +1701,7 @@ def check_collision(exp_inst: Any, runs: List[Dict[str, Any]]) -> None:
 
 @mylogger(log_args=True)
 def check_run_dict(exp_inst, dict_):
+    from experiment.experiment import Experiment
     if not isinstance(exp_inst, Experiment):
         raise TypeError(f'{exp_inst} variable is not an instance of {Experiment}')
     if len(dict_['axes']) != len(exp_inst.axes_rotations):
@@ -1612,23 +1730,29 @@ def check_run_dict(exp_inst, dict_):
 def generate_data_for_runs_table(data: List[Dict[str, Any]], table_num: int) -> List[Dict[str, Any]]:
     data_list = []
     for run in data:
+        det_params = run.get('detector', {})
+        det_angles = det_params.get('det_angles', {'x': 0, 'y': 0, 'z': 0})
+
         dict_ = {
-            f'{table_num}scan_no': run['scan_n'],
-            f'{table_num}det_dist': run['detector']['det_dist'],
-            f'{table_num}det_orientation': run['detector']['det_orientation'],
-            f'{table_num}det_rot_x': run['detector']['det_angles']['x'],
-            f'{table_num}det_rot_y': run['detector']['det_angles']['y'],
-            f'{table_num}det_rot_z': run['detector']['det_angles']['z'],
-            f'{table_num}det_disp_y': run['detector']['det_angles'],
-            f'{table_num}det_disp_z': run['detector']['det_angles'],
-            f'{table_num}scan_sweep': run['sweep'],
+            f'{table_num}scan_no': run.get('scan_n'),
+            f'{table_num}det_dist': det_params.get('det_dist'),
+            f'{table_num}det_orientation': det_params.get('det_orientation'),
+            f'{table_num}det_rot_x': det_angles.get('x'),
+            f'{table_num}det_rot_y': det_angles.get('y'),
+            f'{table_num}det_rot_z': det_angles.get('z'),
+
+            f'{table_num}det_disp_y': det_params.get('det_disp_y', 0),
+            f'{table_num}det_disp_z': det_params.get('det_disp_z', 0),
+
+            f'{table_num}scan_sweep': run.get('sweep'),
         }
-        for axis in run['axes']:
+
+        for axis in run.get('axes', []):
             dict_[f"{table_num}_{axis['number']}_rot"] = axis['angle']
+
         table_num += 1
         data_list.append(dict_)
     return data_list
-
 
 def write_json(to_save: Any) -> None:
     with open('obst.json', 'w', encoding='utf-8') as f:
@@ -1669,7 +1793,7 @@ def check_obstacle_dict(dict_: Dict[str, Any], linked=False) -> bool:
         if not check_dict_value(dict_, ['width', 'height'], classes=(float, int)):
             return False
     if linked:
-        if not check_dict_value(dict_,['linked_axis'],classes=int):
+        if not check_dict_value(dict_, ['linked_axis'], classes=int):
             return False
     return True
 
@@ -1907,7 +2031,8 @@ class CumulativeDataCalculator:
 
 
 class ScanDataContainer:
-    def __init__(self, diff_vecs, hkl, hkl_origin, diff_angles, scan_setup, start_angle, sweep):
+    def __init__(self, scan, diff_vecs, hkl, hkl_origin, diff_angles, scan_setup, start_angle, sweep):
+        self.scan = scan
         self.diff_vecs = diff_vecs
         self.hkl = hkl
         self.hkl_origin = hkl_origin
@@ -1918,7 +2043,17 @@ class ScanDataContainer:
 
 
 class StrategyContainer:
-    scan_data_containers = []
+    def __init__(self):
+        self.scan_data_containers = []
+
+    def __iter__(self):
+        return iter(self.scan_data_containers)
+
+    def __len__(self):
+        return len(self.scan_data_containers)
+
+    def __getitem__(self, index):
+        return self.scan_data_containers[index]
 
     def add_scan_data_container(self, sdc):
         assert isinstance(sdc, ScanDataContainer), 'Wrong scan data format!'
@@ -1928,26 +2063,16 @@ class StrategyContainer:
         self.scan_data_containers = []
 
     def get_hkl(self):
-        hkl = []
-        for scan in self.scan_data_containers:
-            hkl.append(scan.hkl)
-        return hkl
+        return [scan.hkl for scan in self]
 
     def get_hkl_roi(self, d_low, d_high, diffraction_angles_roi):
         pass
 
     def get_hkl_origin(self):
-        hkl_origin = []
-        for scan in self.scan_data_containers:
-            hkl_origin.append(scan.hkl_origin)
-        return hkl_origin
+        return [scan.hkl_origin for scan in self]
 
     def hasdata(self):
-        if self.scan_data_containers:
-            return True
-        else:
-            return False
-
+        return bool(self.scan_data_containers)
 
 def create_cumulative_fig(ordered_hkl_orig, run_indices, parameters, hkl_origin_in_d_range):
     comp_y, comp_x = [], []
